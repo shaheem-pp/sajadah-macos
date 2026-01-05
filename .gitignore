@@ -1,0 +1,57 @@
+# ===== Xcode / Swift =====
+
+# Build
+DerivedData/
+build/
+*.xcarchive
+*.ipa
+
+# User-specific Xcode settings
+*.xcuserstate
+xcuserdata/
+
+# Xcode playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Swift Package Manager
+.build/
+Packages/
+Package.pins
+Package.resolved
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output/
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# Environment / secrets
+.env
+.env.*
+*.mobileprovision
+*.p12
+*.cer
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Optional: keep shared schemes tracked, ignore user schemes
+# (Leave as-is unless you know you want to ignore schemes)
+# *.xcscheme
