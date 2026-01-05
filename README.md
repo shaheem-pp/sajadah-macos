@@ -72,21 +72,6 @@ Project Structure (suggested)
 │       ├── LocationErrorView.swift
 │       └── LocationPermissionView.swift
 └── Sajadah.xcodeproj
-    ├── project.pbxproj
-    ├── project.xcworkspace
-    │   ├── contents.xcworkspacedata
-    │   ├── xcshareddata
-    │   │   └── swiftpm
-    │   │       └── configuration
-    │   └── xcuserdata
-    │       └── shaheem.xcuserdatad
-    │           └── UserInterfaceState.xcuserstate
-    └── xcuserdata
-        └── shaheem.xcuserdatad
-            └── xcschemes
-                └── xcschememanagement.plist
-
-19 directories, 16 files
 
 ```
 Roadmap (optional)
