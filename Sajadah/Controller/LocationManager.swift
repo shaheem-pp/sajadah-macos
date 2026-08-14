@@ -5,14 +5,14 @@
 //  Created by Shaheem on 2026-01-04.
 //
 
+import AppKit
 import CoreLocation
-import Combine
-
+import Observation
 
 // MARK: - Location Manager
 
-@MainActor
-final class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
+@Observable
+final class LocationManager: NSObject, CLLocationManagerDelegate {
     enum State: Equatable {
         case loading
         case home(CLLocationCoordinate2D)
@@ -34,23 +34,23 @@ final class LocationManager: NSObject, ObservableObject, CLLocationManagerDelega
         }
     }
 
-    @Published private(set) var state: State = .loading
+    private(set) var state: State = .loading
 
-    private let manager = CLLocationManager()
-    private var didRequestOnce = false
+    /// Called every time a fresh fix arrives. A direct callback beats observing `state`:
+    /// the store must be told about a new coordinate even when no view is on screen.
+    @ObservationIgnored var onCoordinate: ((CLLocationCoordinate2D) -> Void)?
+
+    @ObservationIgnored private let manager = CLLocationManager()
 
     override init() {
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        observeWake()
     }
 
     func refresh() {
-        #if os(macOS)
         let status = manager.authorizationStatus
-        #else
-        let status = CLLocationManager.authorizationStatus()
-        #endif
         updateStateForAuthorization(status)
         if case .home = state {
             // already have location
@@ -60,15 +60,10 @@ final class LocationManager: NSObject, ObservableObject, CLLocationManagerDelega
     }
 
     func requestPermission() {
-        #if os(macOS)
         let status = manager.authorizationStatus
-        #else
-        let status = CLLocationManager.authorizationStatus()
-        #endif
 
         // If not determined, request permission.
         if status == .notDetermined {
-            didRequestOnce = true
             manager.requestWhenInUseAuthorization()
             state = .loading
             return
@@ -85,18 +80,14 @@ final class LocationManager: NSObject, ObservableObject, CLLocationManagerDelega
     }
 
     func requestLocation() {
-        state = .loading
+        if case .home = state {} else { state = .loading }
         manager.requestLocation()
     }
 
     // MARK: - CLLocationManagerDelegate
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        #if os(macOS)
         let status = manager.authorizationStatus
-        #else
-        let status = CLLocationManager.authorizationStatus()
-        #endif
         updateStateForAuthorization(status)
 
         if isAuthorized(status) {
@@ -112,71 +103,51 @@ final class LocationManager: NSObject, ObservableObject, CLLocationManagerDelega
             return
         }
         state = .home(best.coordinate)
+        onCoordinate?(best.coordinate)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        // A transient failure should not throw away a coordinate we already have — the
+        // menubar can keep counting down from the last known position.
+        if case .home = state { return }
         state = .error(error.localizedDescription)
     }
 
     // MARK: - Helpers
 
-    private func updateStateForAuthorization(_ status: CLAuthorizationStatus) {
-        #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-        switch status {
-        case .authorizedAlways, .authorizedWhenInUse:
-            // We'll request location and move to .home when it arrives.
-            if case .home = state { return }
-            state = .loading
-
-        case .notDetermined:
-            // If we already asked and came back notDetermined (rare), keep prompting UI.
-            state = .needPermission
-
-        case .denied, .restricted:
-            state = .denied
-
-        @unknown default:
-            state = .error("Unknown authorization status.")
+    /// The Mac may have been closed in one city and opened in another.
+    private func observeWake() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in self.refresh() }
         }
-        #elseif os(macOS)
-        switch status {
-        case .authorized, .authorizedAlways, .authorizedWhenInUse:
-            // We'll request location and move to .home when it arrives.
-            if case .home = state { return }
-            state = .loading
-
-        case .notDetermined:
-            // If we already asked and came back notDetermined (rare), keep prompting UI.
-            state = .needPermission
-
-        case .denied, .restricted:
-            state = .denied
-
-        @unknown default:
-            state = .error("Unknown authorization status.")
-        }
-        #else
-        switch status {
-        case .authorized, .authorizedAlways:
-            if case .home = state { return }
-            state = .loading
-        case .notDetermined:
-            state = .needPermission
-        case .denied, .restricted:
-            state = .denied
-        @unknown default:
-            state = .error("Unknown authorization status.")
-        }
-        #endif
     }
 
+    private func updateStateForAuthorization(_ status: CLAuthorizationStatus) {
+        switch status {
+        case .authorizedAlways:
+            // We'll request location and move to .home when it arrives.
+            if case .home = state { return }
+            state = .loading
+
+        case .notDetermined:
+            state = .needPermission
+
+        case .denied, .restricted:
+            state = .denied
+
+        @unknown default:
+            state = .error("Unknown authorization status.")
+        }
+    }
+
+    /// macOS has no `.authorizedWhenInUse` — `requestWhenInUseAuthorization()` resolves to
+    /// `.authorizedAlways` (the same raw value as the deprecated `.authorized`).
     private func isAuthorized(_ status: CLAuthorizationStatus) -> Bool {
-        #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-        return status == .authorizedAlways || status == .authorizedWhenInUse
-        #elseif os(macOS)
-        return status == .authorized
-        #else
-        return false
-        #endif
+        status == .authorizedAlways
     }
 }
