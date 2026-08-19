@@ -25,13 +25,49 @@ struct SajadahWidgetBundle: WidgetBundle {
     }
 }
 
+// MARK: - Backgrounds
+
+/// The quiet background: the system's own widget fill with the khatim lattice over it.
+private struct LatticeBackground: View {
+    var body: some View {
+        ZStack {
+            Rectangle().fill(.fill.tertiary)
+            StarLattice(spacing: 34, lineWidth: 0.7)
+        }
+    }
+}
+
+/// The same hour-of-day wash the app's hero uses, so a widget on the desktop and the popover
+/// in the menubar are recognisably the same thing.
+private struct SkyBackground: View {
+    let prayer: Prayer?
+
+    var body: some View {
+        ZStack {
+            if let prayer {
+                prayer.sky
+                LinearGradient(
+                    colors: [.black.opacity(0.30), .black.opacity(0.02)],
+                    startPoint: .bottomLeading,
+                    endPoint: .topTrailing
+                )
+                StarLattice(spacing: 32, color: Theme.ornamentOnSky, lineWidth: 0.7)
+            } else {
+                Rectangle().fill(.fill.tertiary)
+            }
+        }
+    }
+}
+
 // MARK: - Next prayer
 
 struct NextPrayerWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "NextPrayer", provider: SajadahProvider()) { entry in
             NextPrayerView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
+                .containerBackground(for: .widget) {
+                    SkyBackground(prayer: entry.snapshot.nextEvent(after: entry.date)?.prayer)
+                }
                 .widgetURL(SajadahLink.today)
         }
         .configurationDisplayName("Next Prayer")
@@ -45,27 +81,41 @@ struct NextPrayerView: View {
 
     var body: some View {
         if let next = entry.snapshot.nextEvent(after: entry.date) {
-            VStack(alignment: .leading, spacing: 2) {
-                Label(next.prayer.displayName, systemImage: next.prayer.systemImage)
-                    .font(.headline)
-                    .labelStyle(.titleAndIcon)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 4) {
+                    Text("NEXT")
+                        .font(.system(size: 9, weight: .semibold))
+                        .tracking(1)
+                    Spacer(minLength: 0)
+                    Image(systemName: next.prayer.systemImage)
+                        .font(.system(size: 12, weight: .light))
+                }
+                .foregroundStyle(.white.opacity(0.72))
+
+                Spacer(minLength: 4)
+
+                Text(next.prayer.displayName)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
 
                 // Ticks on its own, so the timeline needs no per-minute entries.
                 Text(next.date, style: .relative)
-                    .font(.system(size: 26, weight: .semibold, design: .rounded))
+                    .font(.system(size: 25, weight: .semibold))
+                    .monospacedDigit()
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
+                    .foregroundStyle(.white)
 
                 Text(next.date, style: .time)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.80))
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 2)
 
                 if let place = entry.snapshot.placeName {
                     Text(place)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.70))
                         .lineLimit(1)
                 }
             }
@@ -82,7 +132,7 @@ struct PrayerTimesWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "PrayerTimes", provider: SajadahProvider()) { entry in
             PrayerTimesView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
+                .containerBackground(for: .widget) { LatticeBackground() }
                 .widgetURL(SajadahLink.today)
         }
         .configurationDisplayName("Today’s Prayers")
@@ -98,39 +148,62 @@ struct PrayerTimesView: View {
         if let day = entry.snapshot.today(at: entry.date) {
             let next = entry.snapshot.nextEvent(after: entry.date)
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 5) {
+                    RubElHizb()
+                        .fill(Theme.jade.opacity(0.55))
+                        .frame(width: 7, height: 7)
                     Text(entry.snapshot.placeName ?? "Today")
                         .font(.caption).fontWeight(.medium)
-                    Spacer()
+                    Spacer(minLength: 6)
                     Text(day.hijri)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                .padding(.bottom, 1)
 
                 ForEach(DayLog.tracked, id: \.self) { prayer in
                     let time = day.time(for: prayer)
                     let isNext = next?.prayer == prayer
-                    HStack(spacing: 6) {
+                    let hasPassed = time < entry.date
+
+                    HStack(spacing: 7) {
                         Image(systemName: prayer.systemImage)
-                            .font(.caption2)
-                            .frame(width: 13)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(hasPassed && !isNext ? prayer.tint.opacity(0.55) : prayer.tint)
+                            .frame(width: 16, height: 16)
+                            .background {
+                                RoundedRectangle(cornerRadius: 4.5, style: .continuous)
+                                    .fill(prayer.tint.opacity(isNext ? 0.16 : 0.09))
+                            }
+
                         Text(prayer.displayName)
                             .fontWeight(isNext ? .semibold : .regular)
+
                         Spacer(minLength: 4)
+
                         if entry.snapshot.state(for: prayer, at: entry.date) == .prayed {
                             Image(systemName: "checkmark")
-                                .font(.caption2)
-                                .foregroundStyle(.green)
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(Theme.jade)
                         }
+
                         Text(time, style: .time)
                             .monospacedDigit()
                             .fontWeight(isNext ? .semibold : .regular)
                     }
                     .font(.caption)
                     // Past prayers recede so the next one reads at a glance.
-                    .foregroundStyle(isNext ? .primary : (time < entry.date ? .tertiary : .secondary))
+                    .foregroundStyle(isNext ? .primary : (hasPassed ? .tertiary : .secondary))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background {
+                        if isNext {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(prayer.tint.opacity(0.13))
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -146,7 +219,7 @@ struct StreakWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "Streak", provider: SajadahProvider()) { entry in
             StreakView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
+                .containerBackground(for: .widget) { LatticeBackground() }
                 .widgetURL(SajadahLink.today)
         }
         .configurationDisplayName("Prayer Streak")
@@ -161,26 +234,29 @@ struct StreakView: View {
     var body: some View {
         let streak = entry.snapshot.currentStreak(at: entry.date)
 
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             Image(systemName: streak > 0 ? "flame.fill" : "flame")
                 .font(.title2)
-                .foregroundStyle(streak > 0 ? .orange : .secondary)
+                .foregroundStyle(streak > 0 ? Theme.brass : .secondary)
+
+            Spacer(minLength: 2)
 
             Text("\(streak)")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .font(.system(size: 34, weight: .bold))
                 .monospacedDigit()
             Text(streak == 1 ? "day streak" : "day streak")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 4)
 
+            // One star per prayer, filled as the day is logged.
             HStack(spacing: 5) {
                 ForEach(DayLog.tracked, id: \.self) { prayer in
-                    Circle()
-                        .fill(entry.snapshot.state(for: prayer, at: entry.date) == .prayed
-                              ? Color.green : Color.secondary.opacity(0.25))
-                        .frame(width: 9, height: 9)
+                    let prayed = entry.snapshot.state(for: prayer, at: entry.date) == .prayed
+                    RubElHizb()
+                        .fill(prayed ? Theme.jade : Color.secondary.opacity(0.22))
+                        .frame(width: 11, height: 11)
                 }
             }
         }
@@ -194,7 +270,7 @@ struct AyahWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "AyahOfTheDay", provider: SajadahProvider()) { entry in
             AyahWidgetView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
+                .containerBackground(for: .widget) { LatticeBackground() }
         }
         .configurationDisplayName("Ayah of the Day")
         .description("A verse each day, with its translation.")
@@ -209,10 +285,15 @@ struct AyahWidgetView: View {
     var body: some View {
         if let ayah = entry.snapshot.dailyAyah {
             VStack(alignment: .leading, spacing: 7) {
-                HStack {
-                    Text("Ayah of the day")
-                        .font(.caption2).foregroundStyle(.secondary)
-                    Spacer()
+                HStack(spacing: 5) {
+                    RubElHizb()
+                        .fill(Theme.jade.opacity(0.55))
+                        .frame(width: 7, height: 7)
+                    Text("AYAH OF THE DAY")
+                        .font(.system(size: 9, weight: .semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 6)
                     Text("\(ayah.surahEnglishName) \(ayah.ref.surah):\(ayah.ref.ayah)")
                         .font(.caption2).foregroundStyle(.tertiary)
                 }
@@ -220,11 +301,17 @@ struct AyahWidgetView: View {
                 Text(ayah.arabic)
                     .font(.arabic(ArabicFontChoice.defaultID, size: family == .systemLarge ? 22 : 17))
                     .lineSpacing(family == .systemLarge ? 10 : 7)
-                    .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    // `.leading` is the right edge inside the right-to-left environment
+                    // below; asking for `.trailing` flushes Arabic to the left.
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .environment(\.layoutDirection, .rightToLeft)
                     .lineLimit(family == .systemLarge ? 6 : 3)
                     .minimumScaleFactor(0.7)
+
+                if family == .systemLarge {
+                    OrnamentDivider()
+                }
 
                 Text(ayah.translation)
                     .font(.caption)
@@ -250,10 +337,17 @@ struct WidgetEmptyView: View {
     let message: String
 
     var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: "moon.stars")
-                .font(.title2)
-                .foregroundStyle(.secondary)
+        VStack(spacing: 8) {
+            ZStack {
+                MihrabArch().fill(Theme.jade.opacity(0.07))
+                MihrabArch().stroke(Theme.jade.opacity(0.28), lineWidth: 1)
+                Image(systemName: "moon.stars")
+                    .font(.system(size: 13, weight: .light))
+                    .foregroundStyle(Theme.jade)
+                    .padding(.top, 10)
+            }
+            .frame(width: 38, height: 47)
+
             Text(message)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
