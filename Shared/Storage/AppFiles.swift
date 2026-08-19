@@ -14,8 +14,15 @@ import Foundation
 /// blank.
 nonisolated enum AppFiles {
 
-    /// macOS requires app group identifiers to be prefixed with the team ID.
-    static let appGroup = "853K3F2A4U.dev.shaheem.Sajadah"
+    /// macOS requires app group identifiers to be prefixed with the team ID, which is why
+    /// this cannot simply be a literal: a fork signs with a different team and would have to
+    /// edit source to build. Both targets instead declare it in their Info.plist as
+    /// `$(TeamIdentifierPrefix)dev.shaheem.Sajadah`, which Xcode expands at build time from
+    /// whatever `DEVELOPMENT_TEAM` is set to. The fallback only matters if that key goes
+    /// missing, and even then the container lookup below degrades rather than crashing.
+    static let appGroup: String = Bundle.main
+        .object(forInfoDictionaryKey: "SajadahAppGroup") as? String
+        ?? "853K3F2A4U.dev.shaheem.Sajadah"
 
     /// True when the shared container is reachable, which is what widgets depend on.
     static var usingSharedContainer: Bool { groupRoot != nil }

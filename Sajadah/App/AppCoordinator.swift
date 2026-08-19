@@ -5,6 +5,7 @@
 
 import Foundation
 import Observation
+import SwiftUI
 import WidgetKit
 
 /// Owns the app's long-lived objects and wires them together.
@@ -111,5 +112,27 @@ final class AppCoordinator {
             // Repeating, so it lives outside the rebuild above and must be reapplied here.
             await scheduler.updateFridayKahfReminder(settings: settings)
         }
+    }
+}
+
+// MARK: - Environment
+
+extension View {
+    /// Injects every long-lived store into the environment in one call.
+    ///
+    /// `SajadahApp` has three scenes — menubar, window and Settings — and each needs the full
+    /// set. Listing them per scene meant a new store had to be wired in three places, and
+    /// missing one failed at runtime in whichever scene was forgotten rather than at compile
+    /// time.
+    func sajadahEnvironment(_ app: AppCoordinator) -> some View {
+        self
+            .environment(app.location)
+            .environment(app.settings)
+            .environment(app.store)
+            .environment(app.log)
+            .environment(app.quran)
+            .environment(app.reading)
+            .environment(app.navigation)
+            .environment(app.scheduler)
     }
 }

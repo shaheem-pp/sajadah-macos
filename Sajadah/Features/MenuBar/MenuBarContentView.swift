@@ -7,6 +7,9 @@ import AppKit
 import SwiftUI
 
 /// The popover behind the menubar item.
+///
+/// A narrower reading of the same day the main window shows: the hero answers the question,
+/// the rows carry the detail, and everything below is one glance deep.
 struct MenuBarContentView: View {
     @Environment(PrayerTimesStore.self) private var store
     @Environment(AppSettings.self) private var settings
@@ -17,27 +20,14 @@ struct MenuBarContentView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 12) {
             if let day = store.today {
-                nextPrayerHeader
-                Divider().padding(.vertical, 8)
-                PrayerListView(
-                    day: day,
-                    highlighted: store.nextEvent?.prayer,
-                    passedBefore: store.now,
-                    use24Hour: settings.use24HourClock,
-                    logging: PrayerLogging(
-                        state: { log.state(for: $0, on: store.todayKey) },
-                        cycle: { log.cycle($0, on: store.todayKey) }
-                    )
-                )
-                Divider().padding(.vertical, 8)
+                hero
+                timings(day)
                 streakRow
-                Divider().padding(.vertical, 8)
-                placeFooter
 
                 if let daily = quran.dailyAyah {
-                    Divider().padding(.vertical, 8)
+                    Divider().overlay(Theme.hairline)
                     AyahOfTheDayView(
                         ayah: daily,
                         arabicFont: settings.arabicFontName,
@@ -48,83 +38,92 @@ struct MenuBarContentView: View {
                 unavailableContent
             }
 
-            Divider().padding(.vertical, 8)
+            Divider().overlay(Theme.hairline)
             actions
         }
         .padding(12)
-        .frame(width: 288)
+        .frame(width: 300)
     }
 
-    // MARK: Header
+    // MARK: Hero
 
-    private var nextPrayerHeader: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text("Next prayer")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if store.isStale {
-                    Label("Offline", systemImage: "wifi.slash")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let next = store.nextEvent, let remaining = store.timeUntilNextEvent {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(next.prayer.displayName)
-                        .font(.system(size: 22, weight: .semibold))
-                    Text("in \(TimeFormatting.countdown(remaining))")
-                        .font(.system(size: 15, weight: .medium))
-                        .monospacedDigit()
-                        .foregroundStyle(Color.accentColor)
-                }
-                Text(TimeFormatting.clock(
+    @ViewBuilder
+    private var hero: some View {
+        if let next = store.nextEvent, let remaining = store.timeUntilNextEvent {
+            NextPrayerHero(
+                prayer: next.prayer,
+                countdown: TimeFormatting.countdown(remaining),
+                clock: TimeFormatting.clock(
                     next.date,
                     use24Hour: settings.use24HourClock,
                     timeZone: store.displayTimeZone
-                ))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            } else {
-                Text("No upcoming prayer times")
-                    .font(.system(size: 16, weight: .medium))
-            }
+                ),
+                place: store.placeName ?? "Current location",
+                hijri: store.hijriDateText,
+                isStale: store.isStale,
+                progress: windowProgress,
+                compact: true
+            )
+        } else {
+            Text("No upcoming prayer times")
+                .font(.system(size: 15, weight: .medium))
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private var windowProgress: Double? {
+        guard let current = store.currentEvent, let next = store.nextEvent else { return nil }
+        let span = next.date.timeIntervalSince(current.date)
+        guard span > 0 else { return nil }
+        return store.now.timeIntervalSince(current.date) / span
+    }
+
+    // MARK: Timings
+
+    private func timings(_ day: DayTimings) -> some View {
+        PrayerListView(
+            day: day,
+            highlighted: store.nextEvent?.prayer,
+            passedBefore: store.now,
+            use24Hour: settings.use24HourClock,
+            logging: PrayerLogging(
+                state: { log.state(for: $0, on: store.todayKey) },
+                cycle: { log.cycle($0, on: store.todayKey) }
+            ),
+            compact: true
+        )
     }
 
     private var streakRow: some View {
         let streak = log.currentStreak(asOf: store.todayKey)
         let prayed = log.prayedCount(on: store.todayKey)
 
-        return HStack(spacing: 6) {
+        return HStack(spacing: 7) {
             Image(systemName: streak > 0 ? "flame.fill" : "flame")
-                .foregroundStyle(streak > 0 ? .orange : .secondary)
+                .font(.system(size: 11))
+                .foregroundStyle(streak > 0 ? Theme.brass : .secondary)
+
             Text(streak == 1 ? "1 day streak" : "\(streak) day streak")
                 .fontWeight(.medium)
-            Spacer()
+
+            Spacer(minLength: 8)
+
             Text("\(prayed)/\(DayLog.tracked.count) today")
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
-        }
-        .font(.callout)
-    }
 
-    private var placeFooter: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Label(store.placeName ?? "Current location", systemImage: "location.fill")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if let hijri = store.hijriDateText {
-                Text(hijri)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
             Text(CalculationMethod.name(for: settings.calculationMethod))
-                .font(.caption2)
+                .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: 74, alignment: .trailing)
+                .help(CalculationMethod.name(for: settings.calculationMethod))
         }
+        .font(.system(size: 12))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Theme.wellFill, in: RoundedRectangle(cornerRadius: Theme.rowRadius, style: .continuous))
     }
 
     // MARK: Empty / error states
@@ -151,7 +150,7 @@ struct MenuBarContentView: View {
                 }
             }
         }
-        .frame(height: 150)
+        .frame(height: 190)
     }
 
     // MARK: Actions

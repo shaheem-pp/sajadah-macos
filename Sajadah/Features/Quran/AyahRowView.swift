@@ -18,36 +18,30 @@ struct AyahRowView: View {
     let isHighlighted: Bool
     let onToggleBookmark: () -> Void
 
+    @State private var isHovering = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
-                AyahBadge(number: ayah.numberInSurah)
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 12) {
+                // The rosette is how a printed mushaf numbers a verse, so it belongs here in
+                // place of a UI badge.
+                AyahRosette(number: ayah.numberInSurah, size: 26)
+                    .padding(.top, 2)
 
                 Text(ayah.arabic)
                     .font(.arabic(arabicFont, size: arabicSize))
                     // Generous, but not arbitrary: Uthmani marks stack high above and below
                     // the baseline, and tighter leading makes them collide between lines.
                     .lineSpacing(arabicSize * 0.45)
-                    .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    // `.leading` reads backwards here on purpose: the environment below
+                    // makes this subtree right-to-left, so leading *is* the right edge.
+                    // Asking for `.trailing` flushes Arabic to the left, which is wrong.
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .environment(\.layoutDirection, .rightToLeft)
                     .textSelection(.enabled)
 
-                VStack(spacing: 6) {
-                    Button(action: onToggleBookmark) {
-                        Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                            .foregroundStyle(isBookmarked ? Color.accentColor : .secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(isBookmarked ? "Remove bookmark" : "Bookmark this ayah")
-
-                    if ayah.hasSajda {
-                        Image(systemName: "figure.mind.and.body")
-                            .foregroundStyle(.secondary)
-                            .help("Verse of prostration")
-                    }
-                }
-                .font(.system(size: 12))
+                controls
             }
 
             if !ayah.translation.isEmpty {
@@ -56,32 +50,44 @@ struct AyahRowView: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.leading, 34)
+                    .padding(.leading, 38)
             }
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
         .background {
-            if isHighlighted {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.accentColor.opacity(0.12))
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(background)
+        }
+        .onHover { isHovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: isHovering)
+    }
+
+    /// Bookmarks stay visible once set; the affordance only appears on hover, so a page of
+    /// unbookmarked verses is a clean column of text.
+    private var controls: some View {
+        VStack(spacing: 7) {
+            Button(action: onToggleBookmark) {
+                Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                    .foregroundStyle(isBookmarked ? Theme.jade : .secondary)
+            }
+            .buttonStyle(.plain)
+            .opacity(isBookmarked || isHovering ? 1 : 0)
+            .help(isBookmarked ? "Remove bookmark" : "Bookmark this ayah")
+
+            if ayah.hasSajda {
+                Image(systemName: "figure.mind.and.body")
+                    .foregroundStyle(Theme.brass)
+                    .help("Verse of prostration")
             }
         }
+        .font(.system(size: 12))
+        .frame(width: 14)
     }
-}
 
-private struct AyahBadge: View {
-    let number: Int
-
-    var body: some View {
-        Text("\(number)")
-            .font(.system(size: 10, weight: .medium))
-            .monospacedDigit()
-            .foregroundStyle(.secondary)
-            .frame(minWidth: 24)
-            .padding(.vertical, 3)
-            .background {
-                Capsule().fill(.quaternary)
-            }
+    private var background: Color {
+        if isHighlighted { return Theme.jade.opacity(0.11) }
+        if isHovering { return Theme.wellFill }
+        return .clear
     }
 }

@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>853K3F2A4U.dev.shaheem.Sajadah</string>
+		<string>$(TeamIdentifierPrefix)dev.shaheem.Sajadah</string>
 	</array>
 </dict>
 </plist>

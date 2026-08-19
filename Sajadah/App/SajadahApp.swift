@@ -18,14 +18,7 @@ struct SajadahApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuBarContentView()
-                .environment(app.location)
-                .environment(app.settings)
-                .environment(app.store)
-                .environment(app.log)
-                .environment(app.quran)
-                .environment(app.reading)
-                .environment(app.navigation)
-                .environment(app.scheduler)
+                .sajadahEnvironment(app)
         } label: {
             // Must be a lone `Image` — MenuBarExtra drops the text from anything richer.
             Image(nsImage: MenuBarLabelRenderer.image(for: app.store.menuBar))
@@ -33,7 +26,7 @@ struct SajadahApp: App {
         .menuBarExtraStyle(.window)
 
         WindowGroup(id: SajadahWindow.main) {
-            AppView()
+            MainWindowView()
                 .onOpenURL { url in
                     // Widget taps arrive as sajadah:// URLs; anything unrecognised just
                     // opens the app rather than doing nothing.
@@ -43,14 +36,7 @@ struct SajadahApp: App {
                         app.navigation.openToday()
                     }
                 }
-                .environment(app.location)
-                .environment(app.settings)
-                .environment(app.store)
-                .environment(app.log)
-                .environment(app.quran)
-                .environment(app.reading)
-                .environment(app.navigation)
-                .environment(app.scheduler)
+                .sajadahEnvironment(app)
         }
         // Sajadah starts in the menubar; the window opens from the popover or the Dock icon
         // rather than appearing unbidden on every login.
@@ -58,14 +44,7 @@ struct SajadahApp: App {
 
         Settings {
             SettingsView()
-                .environment(app.location)
-                .environment(app.settings)
-                .environment(app.store)
-                .environment(app.log)
-                .environment(app.quran)
-                .environment(app.reading)
-                .environment(app.navigation)
-                .environment(app.scheduler)
+                .sajadahEnvironment(app)
         }
     }
 }

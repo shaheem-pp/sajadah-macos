@@ -10,13 +10,14 @@ struct MainWindowView: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(QuranStore.self) private var quran
     @Environment(ReadingProgressStore.self) private var reading
+    @Environment(AppSettings.self) private var settings
 
     @State private var surahFilter = ""
 
     var body: some View {
         NavigationSplitView {
             sidebar
-                .navigationSplitViewColumnWidth(min: 220, ideal: 250)
+                .navigationSplitViewColumnWidth(min: 232, ideal: 258)
         } detail: {
             detail
         }
@@ -46,7 +47,12 @@ struct MainWindowView: View {
                     Button {
                         navigation.open(last)
                     } label: {
-                        Label("Continue \(surah.englishName) \(last.ayah)", systemImage: "arrow.turn.down.right")
+                        Label {
+                            Text("Continue \(Text("\(surah.englishName) \(last.ayah)").fontWeight(.medium))")
+                        } icon: {
+                            Image(systemName: "arrow.turn.down.right")
+                        }
+                        .foregroundStyle(Theme.jade)
                     }
                     .buttonStyle(.plain)
                 }
@@ -54,7 +60,7 @@ struct MainWindowView: View {
 
             Section("Surahs") {
                 ForEach(filteredSurahs) { surah in
-                    SurahRow(surah: surah)
+                    SurahRow(surah: surah, arabicFont: settings.arabicFontName)
                         .tag(SidebarItem.surah(surah.number))
                 }
             }
@@ -100,14 +106,21 @@ struct MainWindowView: View {
 
 private struct SurahRow: View {
     let surah: Surah
+    let arabicFont: String
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 9) {
+            // A numbered chip rather than loose digits — 114 rows need a firm left edge for
+            // the eye to run down.
             Text("\(surah.number)")
-                .font(.caption)
+                .font(.system(size: 10, weight: .medium))
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(width: 24, alignment: .trailing)
+                .foregroundStyle(Theme.jade)
+                .frame(width: 22, height: 17)
+                .background {
+                    RoundedRectangle(cornerRadius: 4.5, style: .continuous)
+                        .fill(Theme.jade.opacity(0.10))
+                }
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(surah.englishName)
@@ -119,10 +132,11 @@ private struct SurahRow: View {
             Spacer(minLength: 6)
 
             Text(surah.name)
-                .font(.arabic("Geeza Pro", size: 13))
+                .font(.arabic(arabicFont, size: 13))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
+        .padding(.vertical, 1)
     }
 }
 
@@ -146,12 +160,19 @@ struct BookmarksView: View {
                 Button {
                     onOpen(ref)
                 } label: {
-                    HStack {
-                        Text(quran.surah(numbered: ref.surah)?.englishName ?? "Surah \(ref.surah)")
-                        Text("\(ref.surah):\(ref.ayah)")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
+                    HStack(spacing: 11) {
+                        AyahRosette(number: ref.ayah, size: 24)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(quran.surah(numbered: ref.surah)?.englishName ?? "Surah \(ref.surah)")
+                            Text("\(ref.surah):\(ref.ayah)")
+                                .font(.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+
                         Spacer()
+
                         Button {
                             reading.toggleBookmark(ref)
                         } label: {
@@ -161,6 +182,7 @@ struct BookmarksView: View {
                         .foregroundStyle(.secondary)
                         .help("Remove bookmark")
                     }
+                    .padding(.vertical, 3)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

@@ -44,10 +44,7 @@ struct SurahReaderView: View {
                     header(text)
 
                     if text.hasBasmala {
-                        Text(QuranText.basmala)
-                            .font(.arabic(settings.arabicFontName, size: settings.arabicFontSize))
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 18)
+                        basmala
                     }
 
                     ForEach(text.ayahs) { ayah in
@@ -69,11 +66,14 @@ struct SurahReaderView: View {
                         }
 
                         if ayah.numberInSurah != text.ayahs.last?.numberInSurah {
-                            Divider().padding(.horizontal, 12)
+                            Rectangle()
+                                .fill(Theme.hairline)
+                                .frame(height: 1)
+                                .padding(.horizontal, 24)
                         }
                     }
                 }
-                .padding(.vertical, 16)
+                .padding(.vertical, 20)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
@@ -89,14 +89,40 @@ struct SurahReaderView: View {
         }
     }
 
-    private func header(_ text: SurahText) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(text.surah.name)
-                .font(.arabic(settings.arabicFontName, size: settings.arabicFontSize * 1.15))
-                .frame(maxWidth: .infinity, alignment: .center)
+    // MARK: Header
 
-            HStack(spacing: 6) {
-                Text("\(text.surah.number). \(text.surah.englishName)")
+    /// The surah opens under a mihrab — the niche a mosque points towards — carrying the
+    /// surah's number, with the Arabic title set large underneath.
+    ///
+    /// The title sits below the arch rather than inside it because surah names run from
+    /// "طه" to "ٱلْمُطَفِّفِينَ"; fitting the longest of them inside a niche would mean
+    /// squashing the arch flat, and a flattened mihrab stops reading as one.
+    private func header(_ text: SurahText) -> some View {
+        VStack(spacing: 12) {
+            ZStack {
+                MihrabArch()
+                    .fill(Theme.jade.opacity(0.06))
+                MihrabArch()
+                    .stroke(Theme.jade.opacity(0.28), lineWidth: 1)
+                MihrabArch()
+                    .inset(by: 4)
+                    .stroke(Theme.jade.opacity(0.14), lineWidth: 0.75)
+
+                Text("\(text.surah.number)")
+                    .font(.system(size: 15, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.jade)
+                    .padding(.top, 16)
+            }
+            .frame(width: 54, height: 68)
+
+            Text(text.surah.name)
+                .font(.arabic(settings.arabicFontName, size: settings.arabicFontSize * 1.2))
+                .environment(\.layoutDirection, .rightToLeft)
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 7) {
+                Text(text.surah.englishName)
                     .fontWeight(.semibold)
                 Text("·")
                 Text(text.surah.englishNameTranslation)
@@ -105,11 +131,27 @@ struct SurahReaderView: View {
                 Text("·")
                 Text(text.surah.revelationType)
             }
-            .font(.caption)
+            .font(.system(size: 11.5))
             .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .center)
         }
-        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 4)
         .padding(.horizontal, 12)
+    }
+
+    private var basmala: some View {
+        VStack(spacing: 14) {
+            OrnamentDivider()
+                .frame(maxWidth: 300)
+
+            Text(QuranText.basmala)
+                .font(.arabic(settings.arabicFontName, size: settings.arabicFontSize))
+                .environment(\.layoutDirection, .rightToLeft)
+
+            OrnamentDivider()
+                .frame(maxWidth: 300)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
     }
 }
