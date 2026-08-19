@@ -98,7 +98,7 @@ jobs:
             echo "cp -R /Volumes/Sajadah/Sajadah.app /Applications/ &&"
             echo "hdiutil detach -quiet /Volumes/Sajadah &&"
             echo "rm /tmp/Sajadah.dmg &&"
-            echo "open -a Sajadah"
+            echo "open /Applications/Sajadah.app"
             echo '```'
             echo
             echo "### Or download the DMG below"

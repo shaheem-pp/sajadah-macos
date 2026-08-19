@@ -35,7 +35,7 @@ hdiutil attach -quiet /tmp/Sajadah.dmg &&
 cp -R /Volumes/Sajadah/Sajadah.app /Applications/ &&
 hdiutil detach -quiet /Volumes/Sajadah &&
 rm /tmp/Sajadah.dmg &&
-open -a Sajadah
+open /Applications/Sajadah.app
 ```
 
 That downloads, installs to Applications, and opens the app.

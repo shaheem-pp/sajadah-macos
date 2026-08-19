@@ -168,7 +168,7 @@ than by macOS:
     cp -R /Volumes/Sajadah/Sajadah.app /Applications/ &&
     hdiutil detach -quiet /Volumes/Sajadah &&
     rm /tmp/Sajadah.dmg &&
-    open -a Sajadah
+    open /Applications/Sajadah.app
 
 
 Source, issues and licence: https://github.com/shaheem-pp/sajadah-macos
@@ -221,7 +221,7 @@ cat <<EOF
       cp -R /Volumes/Sajadah/Sajadah.app /Applications/ &&
       hdiutil detach -quiet /Volumes/Sajadah &&
       rm /tmp/Sajadah.dmg &&
-      open -a Sajadah
+      open /Applications/Sajadah.app
 
   For a browser download, the recovery is:
 
