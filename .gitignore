@@ -5,6 +5,9 @@ DerivedData/
 build/
 *.xcarchive
 *.ipa
+*.dmg
+*.dSYM
+*.dSYM.zip
 
 # User-specific Xcode settings
 *.xcuserstate
@@ -18,8 +21,10 @@ playground.xcworkspace
 .build/
 Packages/
 Package.pins
-Package.resolved
-*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+# Package.resolved is deliberately NOT ignored: it pins exact dependency versions, so
+# committing it is what makes a clone build the same code you built. Only the surrounding
+# swiftpm state is noise.
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/
 
 # CocoaPods
 Pods/
@@ -52,6 +57,14 @@ fastlane/test_output/
 *.swp
 *.swo
 
-# Optional: keep shared schemes tracked, ignore user schemes
-# (Leave as-is unless you know you want to ignore schemes)
-# *.xcscheme
+# ===== Deliberately tracked =====
+#
+# Do not add rules that would catch these — each is generated, but committing it is the point:
+#
+#   Sajadah.xcodeproj/xcshareddata/xcschemes/   Shared schemes. Without them a fresh clone
+#                                               cannot `xcodebuild -scheme Sajadah`, and
+#                                               scripts/release.sh fails. (xcuserdata/ above
+#                                               already excludes the per-user ones.)
+#   Sajadah/Assets.xcassets/**/*.png            The app icon. Regenerate with
+#                                               ./scripts/make-icon.sh
+#   docs/brand/*.png                            README artwork.

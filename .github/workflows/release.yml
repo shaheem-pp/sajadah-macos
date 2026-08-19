@@ -1,0 +1,123 @@
+name: Release
+
+# Publishing a release is a deliberate act, so it is tied to a tag rather than to a merge:
+# pushing to main does nothing, and `git push origin v1.2.3` builds and publishes.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, without the leading v (e.g. 1.0.0)"
+        required: true
+        type: string
+
+# Needed to create the Release and upload the DMG to it. Nothing else is granted.
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Runner images lag new Xcode releases, and a too-old Xcode fails deep in the build with
+      # confusing Swift errors. Fail here instead, with a message that says what is wrong.
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          NEWEST="$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1 || true)"
+          [ -n "$NEWEST" ] || NEWEST=/Applications/Xcode.app
+          sudo xcode-select -s "$NEWEST"
+          xcodebuild -version
+          MAJOR="$(xcodebuild -version | head -1 | sed -E 's/Xcode ([0-9]+).*/\1/')"
+          if [ "$MAJOR" -lt 26 ]; then
+            echo "::error::Sajadah needs Xcode 26 or later (it uses Swift 6.2 language features)."
+            echo "::error::The newest Xcode on this runner is $MAJOR. Available:"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+
+      - name: Resolve version
+        id: v
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION"    >> "$GITHUB_OUTPUT"
+        env:
+          # Passed through the environment rather than interpolated into the script, so a
+          # crafted input cannot break out into the shell.
+          EVENT: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+
+      # No signing secrets. The script builds and signs ad-hoc, which needs no certificate,
+      # no keychain and no Apple ID — the same path it takes on a developer's Mac.
+      - name: Build DMG
+        run: ./scripts/release.sh "$VERSION"
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+
+      - name: Compose release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          set -euo pipefail
+          DMG="build/Sajadah-$VERSION.dmg"
+          test -f "$DMG"
+          SHA="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+
+          # GitHub writes the "what changed" section from merged PRs and commits since the
+          # previous tag. If it fails (e.g. this is the very first tag), carry on without it.
+          CHANGES="$(gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+                        -f tag_name="$TAG" --jq .body 2>/dev/null || true)"
+
+          {
+            echo "## Install"
+            echo
+            echo "Download \`Sajadah-$VERSION.dmg\` below, open it, and drag Sajadah to your Applications folder."
+            echo
+            echo "Sajadah is **not notarized by Apple** — that requires a paid Apple Developer Program membership — so macOS will refuse to open it the first time. Run this once:"
+            echo
+            echo '```bash'
+            echo "xattr -dr com.apple.quarantine /Applications/Sajadah.app"
+            echo '```'
+            echo
+            echo "You can check the download against its checksum first:"
+            echo
+            echo '```'
+            echo "SHA-256  $SHA"
+            echo '```'
+            echo
+            echo "Requires **macOS 15** or later. Widgets are bundled inside the app; add them from Notification Centre."
+            # printf, not echo, so backticks and \$ inside the generated notes stay literal.
+            if [ -n "$CHANGES" ]; then
+              echo
+              printf '%s\n' "$CHANGES"
+            fi
+          } > build/notes.md
+
+          cat build/notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" "build/Sajadah-$VERSION.dmg" \
+            --title "Sajadah $VERSION" \
+            --notes-file build/notes.md
