@@ -64,6 +64,26 @@ can't drift from the UI. After changing anything in `Shared/Design/`:
 
 That rewrites `Sajadah/Assets.xcassets/AppIcon.appiconset/` and `docs/brand/`.
 
+## Packaging a DMG
+
+```bash
+./scripts/release.sh 1.0.0
+```
+
+Needs no signing certificate — it builds and signs ad-hoc, which is also what lets the same
+script run in CI with no secrets.
+
+Install `create-dmg` if you are changing the disk image itself:
+
+```bash
+brew install create-dmg
+```
+
+Without it the script falls back to `hdiutil`, which works but produces a plain window with no
+icon positioning — and the `Read Me First.txt` that tells people how to get past Gatekeeper is
+easy to miss there. The volume name is deliberately fixed at `Sajadah` rather than versioned,
+because the documented one-line installer copies from `/Volumes/Sajadah`.
+
 ## Style
 
 Match the surrounding code. The one convention worth stating: **comments explain _why_, not

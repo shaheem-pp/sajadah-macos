@@ -27,25 +27,57 @@ Timings come from the [Aladhan API](https://aladhan.com/prayer-times-api), the Q
 
 ## Download
 
-**[⬇ Download the latest release](https://github.com/shaheem-pp/sajadah-macos/releases/latest)**
-— open the `.dmg` and drag Sajadah to your Applications folder.
-
-### First launch
-
-Sajadah is **not notarized by Apple**, because notarization requires a paid Apple Developer
-Program membership. macOS will refuse to open it the first time. This is expected, and it is
-not a sign that anything is wrong with the download — you can verify the app's SHA-256 against
-the one published on the release page.
-
-To get past it, run this once in Terminal:
+### Install in one line — no security warning
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/Sajadah.app
+curl -fsSL https://github.com/shaheem-pp/sajadah-macos/releases/latest/download/Sajadah.dmg -o /tmp/Sajadah.dmg &&
+hdiutil attach -quiet /tmp/Sajadah.dmg &&
+cp -R /Volumes/Sajadah/Sajadah.app /Applications/ &&
+hdiutil detach -quiet /Volumes/Sajadah &&
+rm /tmp/Sajadah.dmg &&
+open -a Sajadah
 ```
 
-Alternatively: try to open the app, then go to **System Settings → Privacy & Security**, scroll
-down, and click **Open Anyway**. (The old right-click → Open trick no longer works on macOS 15
-and later.)
+That downloads, installs to Applications, and opens the app.
+
+It is worth knowing *why* this avoids the warning described below, rather than treating it as a
+magic incantation: the quarantine flag that triggers macOS's block is attached by your **browser**
+when it saves the file, not by macOS on everything you download. `curl` does not set it, so there
+is nothing to clear.
+
+### Or download the DMG
+
+**[⬇ Latest release](https://github.com/shaheem-pp/sajadah-macos/releases/latest)**
+
+1. Open the `.dmg` and **drag Sajadah onto the Applications folder**. Opening the app directly
+   from the mounted disk image is *not* the same as installing it — it looks like it should work,
+   and then fails.
+2. Eject the disk image.
+3. Run this once in Terminal:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Sajadah.app
+   ```
+
+The disk image carries these same instructions in a `Read Me First.txt`.
+
+### Troubleshooting
+
+> **"Sajadah" Not Opened**
+> Apple could not verify "Sajadah" is free of malware that may harm your Mac or compromise your
+> privacy.
+
+Click **Done**. Do **not** click *Move to Trash* — it is the highlighted button, but it deletes
+the app. Then run the `xattr` command above and open Sajadah normally. You only ever do this once.
+
+That message means Sajadah is **not notarized by Apple**, which requires a paid Apple Developer
+Program membership this project does not have. macOS shows exactly the same warning for an
+unnotarized app as for a genuinely malicious one, so it is fair to be cautious: the source is
+public, the build is produced by a [GitHub Actions workflow](.github/workflows/release.yml) you
+can read, and every release publishes a SHA-256 you can check against your download.
+
+Going through **System Settings → Privacy & Security → Open Anyway** also works. The old
+right-click → *Open* trick does not, on macOS 15 and later.
 
 ### Two known limitations of unsigned builds
 

@@ -38,6 +38,7 @@ BUILD_DIR=build
 STAGE="$BUILD_DIR/dmg"
 APP="$BUILD_DIR/Build/Products/Release/Sajadah.app"
 DMG="$BUILD_DIR/Sajadah-$VERSION.dmg"
+STABLE_DMG="$BUILD_DIR/Sajadah.dmg"
 
 # ─── Version ──────────────────────────────────────────────────────────────────────────────
 # Both keys appear once per build configuration. agvtool is not usable here: the project has
@@ -120,24 +121,84 @@ mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 
+# Nobody reads a README while staring at a Gatekeeper modal, so the instructions ship inside
+# the disk image itself. The leading space in the filename sorts it first by name.
+cat > "$STAGE/ Read Me First.txt" <<'READMESH'
+Sajadah — installing
+====================
+
+1.  Drag Sajadah.app onto the Applications folder in this window.
+
+    Do NOT just double-click it here. Opening the app from this disk
+    image is not the same as installing it, and it will fail.
+
+2.  Eject this disk image.
+
+3.  Open Terminal and run this one line:
+
+        xattr -dr com.apple.quarantine /Applications/Sajadah.app
+
+4.  Open Sajadah normally. You only ever do step 3 once.
+
+
+Why is step 3 necessary?
+------------------------
+
+If you skip it, macOS says:
+
+    "Sajadah" Not Opened
+    Apple could not verify "Sajadah" is free of malware that may harm
+    your Mac or compromise your privacy.
+
+If you see that, click Done — never "Move to Trash" — and do step 3.
+
+That message appears because Sajadah is not notarized by Apple.
+Notarizing requires a paid Apple Developer Program membership, which
+this project does not have. It is not a statement that anything is
+wrong with the app; an unnotarized app and a malicious one produce the
+identical warning, which is why the source is public and every release
+publishes a SHA-256 you can check.
+
+You can avoid the warning entirely by installing from the terminal
+instead, because the quarantine flag is applied by your browser rather
+than by macOS:
+
+    curl -fsSL https://github.com/shaheem-pp/sajadah-macos/releases/latest/download/Sajadah.dmg -o /tmp/Sajadah.dmg &&
+    hdiutil attach -quiet /tmp/Sajadah.dmg &&
+    cp -R /Volumes/Sajadah/Sajadah.app /Applications/ &&
+    hdiutil detach -quiet /Volumes/Sajadah &&
+    rm /tmp/Sajadah.dmg &&
+    open -a Sajadah
+
+
+Source, issues and licence: https://github.com/shaheem-pp/sajadah-macos
+READMESH
+
 rm -f "$DMG"
+# The volume name is deliberately NOT versioned: the documented one-line installer copies from
+# /Volumes/Sajadah, and that path has to be the same at every release.
 if command -v create-dmg >/dev/null 2>&1; then
     # Prettier window: positioned icons and a sensible size. Optional — brew install create-dmg
     create-dmg \
-        --volname "Sajadah $VERSION" \
-        --window-size 540 380 \
+        --volname "Sajadah" \
+        --window-size 600 420 \
         --icon-size 110 \
-        --icon "Sajadah.app" 140 180 \
-        --app-drop-link 400 180 \
+        --icon "Sajadah.app" 150 190 \
+        --app-drop-link 450 190 \
+        --icon " Read Me First.txt" 300 330 \
         --no-internet-enable \
         "$DMG" "$STAGE" >/dev/null
 else
     hdiutil create \
-        -volname "Sajadah $VERSION" \
+        -volname "Sajadah" \
         -srcfolder "$STAGE" \
         -ov -format UDZO \
         "$DMG" >/dev/null
 fi
+
+# A second copy under a fixed name, so releases/latest/download/Sajadah.dmg is a permanent URL.
+# Without it the installer one-liner would break at every version bump.
+cp "$DMG" "$STABLE_DMG"
 
 SIZE="$(du -h "$DMG" | cut -f1 | tr -d ' ')"
 SHA="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
@@ -146,14 +207,27 @@ cat <<EOF
 
 ────────────────────────────────────────────────────────────────────────
   $DMG  ($SIZE)
+  $STABLE_DMG  (same file, stable name for the latest-download URL)
+
   SHA-256  $SHA
 
-  This build is ad-hoc signed and NOT notarized, so Gatekeeper will
-  block it on first launch. Tell users to run:
+  This build is ad-hoc signed and NOT notarized, so a browser download
+  will be blocked by Gatekeeper on first launch. Installing from the
+  terminal avoids that entirely — the quarantine flag comes from the
+  browser, not from macOS:
+
+      curl -fsSL https://github.com/shaheem-pp/sajadah-macos/releases/latest/download/Sajadah.dmg -o /tmp/Sajadah.dmg &&
+      hdiutil attach -quiet /tmp/Sajadah.dmg &&
+      cp -R /Volumes/Sajadah/Sajadah.app /Applications/ &&
+      hdiutil detach -quiet /Volumes/Sajadah &&
+      rm /tmp/Sajadah.dmg &&
+      open -a Sajadah
+
+  For a browser download, the recovery is:
 
       xattr -dr com.apple.quarantine /Applications/Sajadah.app
 
-  Upload the DMG at:
+  Upload both DMGs at:
   https://github.com/shaheem-pp/sajadah-macos/releases/new?tag=v$VERSION
 ────────────────────────────────────────────────────────────────────────
 EOF

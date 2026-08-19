@@ -77,6 +77,7 @@ jobs:
           set -euo pipefail
           DMG="build/Sajadah-$VERSION.dmg"
           test -f "$DMG"
+          test -f build/Sajadah.dmg
           SHA="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
 
           # GitHub writes the "what changed" section from merged PRs and commits since the
@@ -87,15 +88,32 @@ jobs:
           {
             echo "## Install"
             echo
-            echo "Download \`Sajadah-$VERSION.dmg\` below, open it, and drag Sajadah to your Applications folder."
+            echo "### Recommended — one line, no security warning"
             echo
-            echo "Sajadah is **not notarized by Apple** — that requires a paid Apple Developer Program membership — so macOS will refuse to open it the first time. Run this once:"
+            echo "Sajadah is not notarized by Apple (that needs a paid Apple Developer Program membership), so a **browser** download gets flagged by macOS. Installing from the terminal sidesteps that entirely, because the quarantine flag is applied by the browser rather than by macOS itself:"
+            echo
+            echo '```bash'
+            echo "curl -fsSL https://github.com/$GITHUB_REPOSITORY/releases/latest/download/Sajadah.dmg -o /tmp/Sajadah.dmg &&"
+            echo "hdiutil attach -quiet /tmp/Sajadah.dmg &&"
+            echo "cp -R /Volumes/Sajadah/Sajadah.app /Applications/ &&"
+            echo "hdiutil detach -quiet /Volumes/Sajadah &&"
+            echo "rm /tmp/Sajadah.dmg &&"
+            echo "open -a Sajadah"
+            echo '```'
+            echo
+            echo "### Or download the DMG below"
+            echo
+            echo "1. Open the DMG and **drag Sajadah into your Applications folder**. Opening it from the mounted disk image is not the same as installing it, and will fail."
+            echo "2. Eject the disk image."
+            echo "3. Run this once:"
             echo
             echo '```bash'
             echo "xattr -dr com.apple.quarantine /Applications/Sajadah.app"
             echo '```'
             echo
-            echo "You can check the download against its checksum first:"
+            echo "If you see *\"Apple could not verify Sajadah is free of malware\"*, click **Done** — never *Move to Trash* — then run the command above."
+            echo
+            echo "### Verify the download"
             echo
             echo '```'
             echo "SHA-256  $SHA"
@@ -118,6 +136,8 @@ jobs:
           TAG: ${{ steps.v.outputs.tag }}
         run: |
           set -euo pipefail
-          gh release create "$TAG" "build/Sajadah-$VERSION.dmg" \
+          gh release create "$TAG" \
+            "build/Sajadah-$VERSION.dmg" \
+            "build/Sajadah.dmg" \
             --title "Sajadah $VERSION" \
             --notes-file build/notes.md
