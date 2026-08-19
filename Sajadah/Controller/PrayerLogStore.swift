@@ -28,9 +28,7 @@ final class PrayerLogStore {
         days[dayKey]?.state(for: prayer)
     }
 
-    func isComplete(_ dayKey: String) -> Bool {
-        days[dayKey]?.isComplete ?? false
-    }
+    func isComplete(_ dayKey: String) -> Bool { days.isComplete(dayKey) }
 
     func prayedCount(on dayKey: String) -> Int {
         days[dayKey]?.prayed.count ?? 0
@@ -66,40 +64,9 @@ final class PrayerLogStore {
 
     // MARK: Streaks
 
-    /// Consecutive complete days ending today. Today only counts once every prayer is logged,
-    /// so a day still in progress doesn't look like a broken streak.
-    func currentStreak(asOf todayKey: String) -> Int {
-        var key = todayKey
-        if !isComplete(key) {
-            guard let yesterday = DayKey.previous(key) else { return 0 }
-            key = yesterday
-        }
+    func currentStreak(asOf todayKey: String) -> Int { days.currentStreak(asOf: todayKey) }
 
-        var streak = 0
-        while isComplete(key) {
-            streak += 1
-            guard let previous = DayKey.previous(key) else { break }
-            key = previous
-        }
-        return streak
-    }
-
-    var bestStreak: Int {
-        // Day keys are zero-padded `yyyy-MM-dd`, so a plain string sort is chronological.
-        // Walking the sorted list forward means only `previous` is ever needed to tell
-        // whether a run continues.
-        let complete = days.filter { $0.value.isComplete }.keys.sorted()
-        var best = 0
-        var run = 0
-        var preceding: String?
-
-        for key in complete {
-            run = (preceding != nil && DayKey.previous(key) == preceding) ? run + 1 : 1
-            best = max(best, run)
-            preceding = key
-        }
-        return best
-    }
+    var bestStreak: Int { days.bestStreak }
 
     /// Most recent `count` days, oldest first, for the history grid.
     func recentDays(endingAt todayKey: String, count: Int) -> [(dayKey: String, log: DayLog?)] {
@@ -115,17 +82,7 @@ final class PrayerLogStore {
 
     // MARK: Persistence
 
-    private var fileURL: URL? {
-        guard let base = try? FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        ) else { return nil }
-        let directory = base.appendingPathComponent("Sajadah", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appendingPathComponent("prayer-log.json")
-    }
+    private var fileURL: URL? { AppFiles.url(for: CacheFileName.prayerLog) }
 
     private func load() {
         guard let fileURL, let data = try? Data(contentsOf: fileURL) else { return }

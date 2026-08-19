@@ -333,33 +333,13 @@ final class PrayerTimesStore {
     @ObservationIgnored private var cachedMethod: Int = CalculationMethod.defaultID
     @ObservationIgnored private var cachedSchool: Int = AsrSchool.standard.rawValue
 
-    private struct CacheFile: Codable {
-        var days: [String: DayTimings]
-        var fetchedMonths: [String]
-        var latitude: Double?
-        var longitude: Double?
-        var placeName: String?
-        var method: Int
-        var school: Int
-    }
-
-    private var cacheURL: URL? {
-        guard let base = try? FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        ) else { return nil }
-        let directory = base.appendingPathComponent("Sajadah", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appendingPathComponent("prayer-cache.json")
-    }
+    private var cacheURL: URL? { AppFiles.url(for: CacheFileName.prayerTimes) }
 
     private func loadCache() {
         guard let cacheURL, let data = try? Data(contentsOf: cacheURL) else { return }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        guard let cache = try? decoder.decode(CacheFile.self, from: data) else { return }
+        guard let cache = try? decoder.decode(PrayerCacheFile.self, from: data) else { return }
 
         days = cache.days
         fetchedMonths = Set(cache.fetchedMonths)
@@ -378,7 +358,7 @@ final class PrayerTimesStore {
         cachedSchool = school
         guard let cacheURL else { return }
 
-        let cache = CacheFile(
+        let cache = PrayerCacheFile(
             days: days,
             fetchedMonths: Array(fetchedMonths),
             latitude: coordinate?.latitude,

@@ -28,6 +28,9 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
     /// Called when the user answers a check-in. `nil` means "answered, but record nothing".
     @ObservationIgnored var onCheckInResponse: ((Prayer, String, PrayerLogState?) -> Void)?
 
+    /// Called when a notification asks the app to open a surah.
+    @ObservationIgnored var onOpenSurah: ((Int) -> Void)?
+
     @ObservationIgnored private let center = UNUserNotificationCenter.current()
     @ObservationIgnored private static let maxPending = 60
 
@@ -44,7 +47,12 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
     private enum UserInfoKey {
         static let prayer = "prayer"
         static let dayKey = "dayKey"
+        static let surah = "surah"
     }
+
+    /// Al-Kahf. Traditionally read on Fridays.
+    private static let kahfSurah = 18
+    private static let kahfIdentifier = "friday-al-kahf"
 
     override init() {
         super.init()
@@ -99,7 +107,13 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
         settings: AppSettings,
         placeName: String?
     ) async {
-        center.removeAllPendingNotificationRequests()
+        // Clear only what this method owns. A blanket `removeAllPendingNotificationRequests()`
+        // would also wipe the repeating Friday reminder every time anything changed.
+        let stale = await center.pendingNotificationRequests()
+            .map(\.identifier)
+            .filter { $0 != Self.kahfIdentifier }
+        center.removePendingNotificationRequests(withIdentifiers: stale)
+
         guard authorization == .granted else { return }
 
         var candidates: [(fireDate: Date, request: UNNotificationRequest)] = []
@@ -152,6 +166,34 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
 
     func cancelAll() {
         center.removeAllPendingNotificationRequests()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.kahfIdentifier])
+    }
+
+    /// The Friday Al-Kahf reminder is a single repeating request, so it deliberately sits
+    /// outside `reschedule(...)` — that method wipes and rebuilds the whole batch, which would
+    /// destroy a repeating trigger every time anything else changed.
+    func updateFridayKahfReminder(settings: AppSettings) async {
+        center.removePendingNotificationRequests(withIdentifiers: [Self.kahfIdentifier])
+        guard settings.fridayKahfReminder, authorization == .granted else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Surah Al-Kahf"
+        content.body = "It’s Friday — a good time to read Surah Al-Kahf."
+        content.sound = .default
+        content.userInfo = [UserInfoKey.surah: Self.kahfSurah]
+
+        // weekday 1 is Sunday in the Gregorian calendar, so Friday is 6.
+        var components = DateComponents()
+        components.weekday = 6
+        components.hour = settings.fridayKahfMinutes / 60
+        components.minute = settings.fridayKahfMinutes % 60
+
+        let request = UNNotificationRequest(
+            identifier: Self.kahfIdentifier,
+            content: content,
+            trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        )
+        try? await center.add(request)
     }
 
     // MARK: Request building
@@ -248,6 +290,12 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse
     ) async {
         let content = response.notification.request.content
+
+        if let surah = content.userInfo[UserInfoKey.surah] as? Int {
+            onOpenSurah?(surah)
+            return
+        }
+
         guard let raw = content.userInfo[UserInfoKey.prayer] as? String,
               let prayer = Prayer(rawValue: raw),
               let dayKey = content.userInfo[UserInfoKey.dayKey] as? String else { return }

@@ -88,6 +88,55 @@ final class AppSettings {
         }
     }
 
+    // MARK: Quran
+
+    var translationEdition: String {
+        didSet {
+            guard translationEdition != oldValue else { return }
+            defaults.set(translationEdition, forKey: Key.translationEdition)
+            // Cached surah text is tied to an edition, so all of it is now wrong.
+            onTranslationChanged?()
+        }
+    }
+
+    var arabicFontName: String {
+        didSet {
+            guard arabicFontName != oldValue else { return }
+            defaults.set(arabicFontName, forKey: Key.arabicFontName)
+        }
+    }
+
+    var arabicFontSize: Double {
+        didSet {
+            guard arabicFontSize != oldValue else { return }
+            defaults.set(arabicFontSize, forKey: Key.arabicFontSize)
+        }
+    }
+
+    var translationFontSize: Double {
+        didSet {
+            guard translationFontSize != oldValue else { return }
+            defaults.set(translationFontSize, forKey: Key.translationFontSize)
+        }
+    }
+
+    var fridayKahfReminder: Bool {
+        didSet {
+            guard fridayKahfReminder != oldValue else { return }
+            defaults.set(fridayKahfReminder, forKey: Key.fridayKahfReminder)
+            onNotificationPreferencesChanged?()
+        }
+    }
+
+    /// Minutes from local midnight for the Friday Al-Kahf reminder.
+    var fridayKahfMinutes: Int {
+        didSet {
+            guard fridayKahfMinutes != oldValue else { return }
+            defaults.set(fridayKahfMinutes, forKey: Key.fridayKahfMinutes)
+            onNotificationPreferencesChanged?()
+        }
+    }
+
     // MARK: Display
 
     var use24HourClock: Bool {
@@ -111,6 +160,8 @@ final class AppSettings {
 
     /// Called when a change invalidates cached timings (method or Asr school).
     var onCalculationChanged: (() -> Void)?
+    /// Called when a change invalidates cached Quran text (translation edition).
+    var onTranslationChanged: (() -> Void)?
     /// Called when the set of notifications that should be pending changes.
     var onNotificationPreferencesChanged: (() -> Void)?
 
@@ -132,6 +183,12 @@ final class AppSettings {
         checkInsEnabled = defaults.object(forKey: Key.checkInsEnabled) as? Bool ?? true
         checkInOffsetMinutes = defaults.object(forKey: Key.checkInOffsetMinutes) as? Int ?? 10
         ishaCutoffMinutes = defaults.object(forKey: Key.ishaCutoffMinutes) as? Int ?? (23 * 60)
+        translationEdition = defaults.string(forKey: Key.translationEdition) ?? QuranTranslation.defaultID
+        arabicFontName = defaults.string(forKey: Key.arabicFontName) ?? ArabicFontChoice.defaultID
+        arabicFontSize = defaults.object(forKey: Key.arabicFontSize) as? Double ?? 26
+        translationFontSize = defaults.object(forKey: Key.translationFontSize) as? Double ?? 13
+        fridayKahfReminder = defaults.object(forKey: Key.fridayKahfReminder) as? Bool ?? true
+        fridayKahfMinutes = defaults.object(forKey: Key.fridayKahfMinutes) as? Int ?? (9 * 60)
         use24HourClock = defaults.object(forKey: Key.use24HourClock) as? Bool ?? false
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
@@ -176,6 +233,12 @@ final class AppSettings {
         static let checkInsEnabled = "checkInsEnabled"
         static let checkInOffsetMinutes = "checkInOffsetMinutes"
         static let ishaCutoffMinutes = "ishaCutoffMinutes"
+        static let translationEdition = "translationEdition"
+        static let arabicFontName = "arabicFontName"
+        static let arabicFontSize = "arabicFontSize"
+        static let translationFontSize = "translationFontSize"
+        static let fridayKahfReminder = "fridayKahfReminder"
+        static let fridayKahfMinutes = "fridayKahfMinutes"
         static let use24HourClock = "use24HourClock"
     }
 }

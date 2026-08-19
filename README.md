@@ -1,8 +1,8 @@
 # Sajadah
 
-A macOS menubar app that counts down to the next prayer, using the [Aladhan API](https://aladhan.com/prayer-times-api) for timings and CoreLocation for your position.
+A macOS menubar app for prayer times and Quran reading, using the [Aladhan API](https://aladhan.com/prayer-times-api) for timings, [alquran.cloud](https://alquran.cloud/api) for the Quran, and CoreLocation for your position.
 
-The menubar item shows the next prayer and the time remaining — `🌙 Asr 1h 23m`. Clicking it opens a popover with today's full timings; there's also a window with the week ahead, and local notifications at each prayer.
+The menubar item shows the next prayer and the time remaining — `🌙 Asr 1h 23m`. Clicking it opens a popover with today's full timings and the verse of the day; the main window holds the week ahead, your prayer streak, and a Quran reader.
 
 ## Features
 
@@ -12,6 +12,9 @@ The menubar item shows the next prayer and the time remaining — `🌙 Asr 1h 2
 - Local notifications at prayer time, with per-prayer toggles and an optional "N minutes before" offset
 - Two-stage check-ins that ask whether you prayed, with Yes/No buttons right on the notification
 - Prayer log with daily streaks, a best-streak record, and a 30-day history grid
+- Quran reader with all 114 surahs, Arabic interleaved with your choice of 17 English translations
+- Full-text translation search, bookmarks, resume-where-you-left-off, and a verse of the day
+- Friday reminder to read Surah Al-Kahf
 - 17 calculation methods and both Asr conventions, changeable in Settings
 - Works offline: timings are cached a month at a time on disk and keep displaying with an "Offline" badge if a refresh fails
 - Refreshes on wake, on day rollover, on clock changes, and when you move more than 5 km
@@ -61,6 +64,23 @@ Location does not work reliably in SwiftUI Previews under the sandbox — run th
 - **`Ticker`** advances the clock once a second via an async loop rather than a run-loop timer, so it keeps ticking while the popover is open.
 - **`NotificationScheduler`** rewrites the whole pending batch whenever timings, preferences or the prayer log change. Rather than rationing each kind of notification separately, it builds every candidate, sorts by fire date and keeps the nearest 60 — so the 64-request budget always goes to whatever happens soonest.
 - **`PrayerLogStore`** records what was prayed in its own file, deliberately separate from the timings cache: it is the user's own data and must survive a location change, a method change or a cache wipe.
+
+### Quran
+
+The main window is a `NavigationSplitView`: prayer times and the Quran share one window. The location permission flow lives inside the prayer pane only, so a denied location never blocks reading.
+
+**`QuranAPI`** fetches Arabic and translation in a single request per surah (`/v1/surah/{n}/editions/quran-uthmani,{translation}`) and normalises the text before anything else sees it. Two quirks in that feed make the normalisation load-bearing:
+
+- The Uthmani edition **prepends the Basmala** to ayah 1 of every surah except 1 and 9, while translations do not. Left alone, the Arabic and the translation drift apart from the first verse. It is stripped and re-rendered as a header. Surah 1 keeps it, because there it genuinely *is* ayah 1; surah 9 never had one. Surah 1 also arrives with a stray U+FEFF.
+- `sajda` is `false` on ordinary verses but an **object** on prostration verses, so decoding it as a `Bool` throws partway through Surah As-Sajda.
+
+Surahs are cached to `Application Support/Sajadah/quran/` as they are read — 72 KB for Al-Kahf, 240 KB for the longest surah — and the cache is keyed by translation edition, so switching translation invalidates it. Bookmarks and reading position live in their own file, separate from that cache.
+
+**The Arabic font is bundled.** macOS's own Arabic faces are UI fonts, and asking them to typeset Uthmani script goes visibly wrong: waqf marks float away from the word, the small high rounded zero degrades to a sukun, the small low meem is dropped, and the ayah marker leaves its numeral outside the rosette instead of nested inside it. Mishafi, despite the name, is optically tiny and collides its diacritics; Waseem mangles the shaping outright.
+
+So the app ships **Amiri Quran** — purpose-built for Quranic typesetting, 137 KB, under the SIL Open Font License 1.1, which permits redistribution. It is registered into the process at launch via `CTFontManagerRegisterFontsForURL`, so nothing is installed into the user's Font Book. The system faces stay in the picker as a matter of taste, filtered to whatever actually resolves so the picker can never offer a font that would silently fall back. Settings shows a live preview, because the faces differ enormously at identical point sizes.
+
+The font and its licence live in `Sajadah/Resources/Fonts/`.
 
 ### Check-ins
 

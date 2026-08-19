@@ -12,6 +12,8 @@ struct MenuBarContentView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(LocationManager.self) private var location
     @Environment(PrayerLogStore.self) private var log
+    @Environment(QuranStore.self) private var quran
+    @Environment(AppNavigation.self) private var navigation
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -33,6 +35,15 @@ struct MenuBarContentView: View {
                 streakRow
                 Divider().padding(.vertical, 8)
                 placeFooter
+
+                if let daily = quran.dailyAyah {
+                    Divider().padding(.vertical, 8)
+                    AyahOfTheDayView(
+                        ayah: daily,
+                        arabicFont: settings.arabicFontName,
+                        onOpen: { openReader(at: daily.ref) }
+                    )
+                }
             } else {
                 unavailableContent
             }
@@ -160,12 +171,20 @@ struct MenuBarContentView: View {
             .help("Open Sajadah settings")
 
             Button {
-                NSApp.activate(ignoringOtherApps: true)
-                openWindow(id: SajadahWindow.main)
+                navigation.openToday()
+                showWindow()
             } label: {
                 Label("Window", systemImage: "macwindow")
             }
-            .help("Open the full prayer times window")
+            .help("Open the full window")
+
+            Button {
+                navigation.selection = .quranSearch
+                showWindow()
+            } label: {
+                Label("Quran", systemImage: "book")
+            }
+            .help("Open the Quran reader")
 
             Spacer()
 
@@ -178,6 +197,16 @@ struct MenuBarContentView: View {
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.accessoryBar)
+    }
+
+    private func openReader(at ref: AyahRef) {
+        navigation.open(ref)
+        showWindow()
+    }
+
+    private func showWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        openWindow(id: SajadahWindow.main)
     }
 
     static func openLocationSystemSettings() {

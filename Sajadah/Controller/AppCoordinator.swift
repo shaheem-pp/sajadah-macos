@@ -5,6 +5,7 @@
 
 import Foundation
 import Observation
+import WidgetKit
 
 /// Owns the app's long-lived objects and wires them together.
 ///
@@ -17,12 +18,23 @@ final class AppCoordinator {
     let settings = AppSettings()
     let store = PrayerTimesStore()
     let log = PrayerLogStore()
+    let quran = QuranStore()
+    let reading = ReadingProgressStore()
+    let navigation = AppNavigation()
     let scheduler = NotificationScheduler()
 
     @ObservationIgnored private var ticker: Ticker?
 
     init() {
+        // Before anything reads or writes: data written by pre-widget builds lives in
+        // Application Support, and would otherwise look like a lost prayer log and streak.
+        AppFiles.migrateFromApplicationSupportIfNeeded()
+
+        // Before any view renders, or the reader's first frame falls back to a UI font.
+        BundledFonts.registerAll()
+
         store.configure(settings: settings)
+        quran.configure(settings: settings)
 
         location.onCoordinate = { [store] coordinate in
             store.updateCoordinate(coordinate)
@@ -35,17 +47,31 @@ final class AppCoordinator {
         }
         store.onEventsChanged = { [weak self] in
             self?.rescheduleNotifications()
+            WidgetCenter.shared.reloadAllTimelines()
         }
         // Logging a prayer retires its outstanding questions: the reschedule below rebuilds
         // the batch from scratch and simply omits anything already answered.
         log.onChange = { [weak self] in
             self?.rescheduleNotifications()
+            // Widgets read the cache rather than polling, so they need telling it moved.
+            WidgetCenter.shared.reloadAllTimelines()
         }
         scheduler.onCheckInResponse = { [log] prayer, dayKey, state in
             log.set(state, for: prayer, on: dayKey)
         }
+        scheduler.onOpenSurah = { [navigation] surah in
+            navigation.openSurah(surah)
+        }
+        settings.onTranslationChanged = { [quran] in
+            quran.invalidateTexts()
+        }
 
-        ticker = Ticker { [store] date in store.tick(date) }
+        ticker = Ticker { [store, quran] date in
+            store.tick(date)
+            // Follows the same day boundary the prayer times use, so the verse turns over
+            // with everything else rather than at the Mac's midnight.
+            quran.refreshDailyAyah(dayKey: store.todayKey)
+        }
         ticker?.start()
 
         Task { [weak self] in await self?.start() }
@@ -61,8 +87,12 @@ final class AppCoordinator {
         store.refreshPlaceNameIfNeeded()
         store.refresh()
 
+        quran.loadSurahList()
+        quran.refreshDailyAyah(dayKey: store.todayKey)
+
         await scheduler.requestAuthorizationIfNeeded()
         rescheduleNotifications()
+        await scheduler.updateFridayKahfReminder(settings: settings)
     }
 
     private func rescheduleNotifications() {
@@ -78,6 +108,8 @@ final class AppCoordinator {
                 settings: settings,
                 placeName: store.placeName
             )
+            // Repeating, so it lives outside the rebuild above and must be reapplied here.
+            await scheduler.updateFridayKahfReminder(settings: settings)
         }
     }
 }

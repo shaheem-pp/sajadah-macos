@@ -41,7 +41,7 @@ struct HomeView: View {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(minWidth: 560, minHeight: 480)
+        .frame(minWidth: 480, minHeight: 420)
     }
 
     // MARK: Header

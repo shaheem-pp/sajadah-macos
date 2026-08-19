@@ -22,6 +22,9 @@ struct SajadahApp: App {
                 .environment(app.settings)
                 .environment(app.store)
                 .environment(app.log)
+                .environment(app.quran)
+                .environment(app.reading)
+                .environment(app.navigation)
                 .environment(app.scheduler)
         } label: {
             // Must be a lone `Image` — MenuBarExtra drops the text from anything richer.
@@ -31,10 +34,22 @@ struct SajadahApp: App {
 
         WindowGroup(id: SajadahWindow.main) {
             AppView()
+                .onOpenURL { url in
+                    // Widget taps arrive as sajadah:// URLs; anything unrecognised just
+                    // opens the app rather than doing nothing.
+                    if let ref = SajadahLink.parse(url) {
+                        app.navigation.open(ref)
+                    } else {
+                        app.navigation.openToday()
+                    }
+                }
                 .environment(app.location)
                 .environment(app.settings)
                 .environment(app.store)
                 .environment(app.log)
+                .environment(app.quran)
+                .environment(app.reading)
+                .environment(app.navigation)
                 .environment(app.scheduler)
         }
         // Sajadah starts in the menubar; the window opens from the popover or the Dock icon
@@ -47,6 +62,9 @@ struct SajadahApp: App {
                 .environment(app.settings)
                 .environment(app.store)
                 .environment(app.log)
+                .environment(app.quran)
+                .environment(app.reading)
+                .environment(app.navigation)
                 .environment(app.scheduler)
         }
     }
