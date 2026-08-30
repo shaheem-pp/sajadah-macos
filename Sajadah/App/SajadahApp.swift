@@ -21,6 +21,7 @@ struct SajadahApp: App {
                 .sajadahEnvironment(app)
         } label: {
             // Must be a lone `Image` — MenuBarExtra drops the text from anything richer.
+            // `app.store.menuBar` already accounts for Iqamah — see PrayerTimesStore.tick(_:iqamah:).
             Image(nsImage: MenuBarLabelRenderer.image(for: app.store.menuBar))
         }
         .menuBarExtraStyle(.window)

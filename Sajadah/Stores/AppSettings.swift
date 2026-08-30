@@ -137,6 +137,81 @@ final class AppSettings {
         }
     }
 
+    // MARK: Masjid
+
+    /// Where Iqamah times come from: scraped from a masjid's own page, or computed locally as a
+    /// fixed number of minutes after each Adhan — the convention at masjids with no posted
+    /// schedule of their own, or whose site can't be read this way (e.g. it renders its
+    /// schedule with JavaScript, which a plain page fetch never executes).
+    enum IqamahSourceMode: String, Sendable {
+        case website
+        case offset
+    }
+
+    var iqamahSourceMode: IqamahSourceMode {
+        didSet {
+            guard iqamahSourceMode != oldValue else { return }
+            defaults.set(iqamahSourceMode.rawValue, forKey: Key.iqamahSourceMode)
+            onIqamahSourceChanged?()
+        }
+    }
+
+    /// `nil` means "not configured" — a meaningfully different state here, since it's what
+    /// opts the Iqamah widget out entirely rather than falling back to some default.
+    var masjidURL: String? {
+        didSet {
+            guard masjidURL != oldValue else { return }
+            if let masjidURL {
+                defaults.set(masjidURL, forKey: Key.masjidURL)
+            } else {
+                defaults.removeObject(forKey: Key.masjidURL)
+            }
+            onIqamahSourceChanged?()
+        }
+    }
+
+    /// Minutes after each Adhan that Iqamah starts, used when `iqamahSourceMode == .offset`.
+    /// Defaults follow common practice — Maghrib's window is short, so masjids run it soonest.
+    var iqamahOffsetFajr: Int {
+        didSet {
+            guard iqamahOffsetFajr != oldValue else { return }
+            defaults.set(iqamahOffsetFajr, forKey: Key.iqamahOffsetFajr)
+            onIqamahSourceChanged?()
+        }
+    }
+
+    var iqamahOffsetDhuhr: Int {
+        didSet {
+            guard iqamahOffsetDhuhr != oldValue else { return }
+            defaults.set(iqamahOffsetDhuhr, forKey: Key.iqamahOffsetDhuhr)
+            onIqamahSourceChanged?()
+        }
+    }
+
+    var iqamahOffsetAsr: Int {
+        didSet {
+            guard iqamahOffsetAsr != oldValue else { return }
+            defaults.set(iqamahOffsetAsr, forKey: Key.iqamahOffsetAsr)
+            onIqamahSourceChanged?()
+        }
+    }
+
+    var iqamahOffsetMaghrib: Int {
+        didSet {
+            guard iqamahOffsetMaghrib != oldValue else { return }
+            defaults.set(iqamahOffsetMaghrib, forKey: Key.iqamahOffsetMaghrib)
+            onIqamahSourceChanged?()
+        }
+    }
+
+    var iqamahOffsetIsha: Int {
+        didSet {
+            guard iqamahOffsetIsha != oldValue else { return }
+            defaults.set(iqamahOffsetIsha, forKey: Key.iqamahOffsetIsha)
+            onIqamahSourceChanged?()
+        }
+    }
+
     // MARK: Display
 
     var use24HourClock: Bool {
@@ -164,6 +239,9 @@ final class AppSettings {
     var onTranslationChanged: (() -> Void)?
     /// Called when the set of notifications that should be pending changes.
     var onNotificationPreferencesChanged: (() -> Void)?
+    /// Called when anything about where Iqamah times come from changes — the mode, the URL, or
+    /// any offset — so the Iqamah store can re-derive them.
+    var onIqamahSourceChanged: (() -> Void)?
 
     // MARK: Init
 
@@ -191,6 +269,14 @@ final class AppSettings {
         fridayKahfMinutes = defaults.object(forKey: Key.fridayKahfMinutes) as? Int ?? (9 * 60)
         use24HourClock = defaults.object(forKey: Key.use24HourClock) as? Bool ?? false
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        iqamahSourceMode = (defaults.string(forKey: Key.iqamahSourceMode)).flatMap(IqamahSourceMode.init(rawValue:))
+            ?? .website
+        masjidURL = defaults.string(forKey: Key.masjidURL)
+        iqamahOffsetFajr = defaults.object(forKey: Key.iqamahOffsetFajr) as? Int ?? 20
+        iqamahOffsetDhuhr = defaults.object(forKey: Key.iqamahOffsetDhuhr) as? Int ?? 15
+        iqamahOffsetAsr = defaults.object(forKey: Key.iqamahOffsetAsr) as? Int ?? 15
+        iqamahOffsetMaghrib = defaults.object(forKey: Key.iqamahOffsetMaghrib) as? Int ?? 10
+        iqamahOffsetIsha = defaults.object(forKey: Key.iqamahOffsetIsha) as? Int ?? 15
     }
 
     // MARK: Helpers
@@ -240,5 +326,12 @@ final class AppSettings {
         static let fridayKahfReminder = "fridayKahfReminder"
         static let fridayKahfMinutes = "fridayKahfMinutes"
         static let use24HourClock = "use24HourClock"
+        static let iqamahSourceMode = "iqamahSourceMode"
+        static let masjidURL = "masjidURL"
+        static let iqamahOffsetFajr = "iqamahOffsetFajr"
+        static let iqamahOffsetDhuhr = "iqamahOffsetDhuhr"
+        static let iqamahOffsetAsr = "iqamahOffsetAsr"
+        static let iqamahOffsetMaghrib = "iqamahOffsetMaghrib"
+        static let iqamahOffsetIsha = "iqamahOffsetIsha"
     }
 }

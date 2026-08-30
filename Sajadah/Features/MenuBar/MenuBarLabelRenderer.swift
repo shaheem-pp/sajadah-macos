@@ -46,6 +46,14 @@ enum MenuBarLabelRenderer {
             Text(content.prayer)
                 .font(.system(size: 12.5, weight: .medium))
 
+            // A small marker when this has retargeted to Iqamah, so it doesn't silently look
+            // like an Adhan countdown that's running suspiciously close to zero.
+            if content.moment == .iqamah {
+                Image(systemName: "building.columns")
+                    .font(.system(size: 9, weight: .medium))
+                    .opacity(0.7)
+            }
+
             if !content.countdown.isEmpty {
                 Text(content.countdown)
                     .font(.system(size: 11, weight: .semibold))

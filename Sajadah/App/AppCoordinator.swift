@@ -18,6 +18,7 @@ final class AppCoordinator {
     let location = LocationManager()
     let settings = AppSettings()
     let store = PrayerTimesStore()
+    let iqamah = IqamahStore()
     let log = PrayerLogStore()
     let quran = QuranStore()
     let reading = ReadingProgressStore()
@@ -35,6 +36,7 @@ final class AppCoordinator {
         BundledFonts.registerAll()
 
         store.configure(settings: settings)
+        iqamah.configure(settings: settings, prayerTimes: store)
         quran.configure(settings: settings)
 
         location.onCoordinate = { [store] coordinate in
@@ -48,6 +50,12 @@ final class AppCoordinator {
         }
         store.onEventsChanged = { [weak self] in
             self?.rescheduleNotifications()
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+        settings.onIqamahSourceChanged = { [iqamah] in
+            iqamah.refresh()
+        }
+        iqamah.onTimesChanged = {
             WidgetCenter.shared.reloadAllTimelines()
         }
         // Logging a prayer retires its outstanding questions: the reschedule below rebuilds
@@ -67,11 +75,12 @@ final class AppCoordinator {
             quran.invalidateTexts()
         }
 
-        ticker = Ticker { [store, quran] date in
-            store.tick(date)
+        ticker = Ticker { [store, quran, iqamah] date in
+            store.tick(date, iqamah: iqamah.times)
             // Follows the same day boundary the prayer times use, so the verse turns over
             // with everything else rather than at the Mac's midnight.
             quran.refreshDailyAyah(dayKey: store.todayKey)
+            iqamah.tick(date)
         }
         ticker?.start()
 
@@ -87,6 +96,7 @@ final class AppCoordinator {
         // immediately rather than waiting on CoreLocation.
         store.refreshPlaceNameIfNeeded()
         store.refresh()
+        iqamah.refresh()
 
         quran.loadSurahList()
         quran.refreshDailyAyah(dayKey: store.todayKey)
@@ -129,6 +139,7 @@ extension View {
             .environment(app.location)
             .environment(app.settings)
             .environment(app.store)
+            .environment(app.iqamah)
             .environment(app.log)
             .environment(app.quran)
             .environment(app.reading)

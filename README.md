@@ -110,6 +110,7 @@ If either matters to you, build from source — it takes about two minutes.
 - Works offline: timings are cached a month at a time on disk and keep displaying with an "Offline" badge if a refresh fails
 - Refreshes on wake, on day rollover, on clock changes, and when you move more than 5 km
 - Optional launch at login
+- Masjid Iqamah times — scraped from your masjid's own page, or computed as minutes after Adhan for masjids with no site of their own — shown in the menubar, popover, main window and a widget
 
 ## Widgets
 
@@ -119,6 +120,7 @@ Sajadah ships a WidgetKit extension. Add widgets from Notification Centre → Ed
 |---|---|---|
 | Next prayer | Small, Medium | The next prayer, its time, and the countdown, over that hour's sky gradient |
 | Today | Medium, Large | All six timings with the next one marked, plus your streak |
+| Masjid Iqamah | Medium, Large | Adhan → Iqamah for each daily prayer, plus Jummah, from your configured masjid (Settings → Masjid) |
 | Verse of the day | Medium, Large | The day's ayah in Arabic with its translation |
 
 Widgets read the same on-disk cache the app writes, so they keep working offline and cost no
@@ -175,14 +177,14 @@ the project structure**, so adding or moving a Swift file needs no `.xcodeproj` 
 
 ```
 Shared/            Compiled into BOTH the app and the widget extension
-  Models/          Prayer, PrayerLog, Quran — plain value types
+  Models/          Prayer, PrayerLog, Quran, Iqamah — plain value types
   Design/          Theme (colours, metrics) and IslamicOrnaments (shapes)
   Storage/         App Group file locations and the on-disk cache
   Fonts/           Amiri Quran + the code that registers it
 Sajadah/
   App/             Entry point, AppCoordinator, navigation
-  Services/        Network clients, CoreLocation, notifications, the ticker
-  Stores/          Observable state: timings, prayer log, Quran, settings
+  Services/        Network clients, CoreLocation, notifications, the ticker, IqamahScraper, IqamahOffsetCalculator
+  Stores/          Observable state: timings, prayer log, Quran, settings, Iqamah
   Features/        One folder per surface — MenuBar, Prayer, Quran, Settings
   UI/              Shared views and formatting used across features
 SajadahWidgets/    WidgetKit extension
@@ -199,6 +201,33 @@ whether or not any view is on screen:
 - **`Ticker`** advances the clock once a second via an async loop rather than a run-loop timer, so it keeps ticking while the popover is open.
 - **`NotificationScheduler`** rewrites the whole pending batch whenever timings, preferences or the prayer log change. Rather than rationing each kind of notification separately, it builds every candidate, sorts by fire date and keeps the nearest 60 — so the 64-request budget always goes to whatever happens soonest.
 - **`PrayerLogStore`** records what was prayed in its own file, deliberately separate from the timings cache: it is the user's own data and must survive a location change, a method change or a cache wipe.
+
+### Iqamah
+
+Adhan (the call to prayer) is calculated; Iqamah (when the congregation actually starts) is set
+by each masjid and published nowhere but its own website — so Sajadah reads it two ways,
+configurable in Settings → Masjid:
+
+- **From a masjid's page.** `IqamahScraper` fetches the page and looks for recognisable prayer
+  labels ("Fajr", "Dhuhr", …) next to a time-like token, rather than at any CSS selector or DOM
+  path. That's deliberate: a real WordPress/Elementor page inspected while building this has
+  every element's class auto-generated (`elementor-element-0006389`) and regenerated on every
+  redesign, while the label text is exactly what a human visitor reads to find the times — the
+  one thing unlikely to disappear. A page missing one prayer still reports the other six rather
+  than failing outright, with a live preview in Settings of exactly what was found before it's
+  ever relied on. Pages that render their schedule with JavaScript (Next.js, React, Nuxt,
+  Angular) are fingerprinted from markers already in the plain HTTP response and named
+  specifically in the error, since a page fetch never executes that script and the text
+  genuinely never arrives — no matter how the label search is tuned.
+- **Minutes after Adhan.** For masjids with no posted schedule, or a site the scraper can't read,
+  a fixed per-prayer offset — Maghrib defaults shorter than the rest, matching how most masjids
+  actually run it — computed straight from the Adhan times already on hand. No network involved.
+
+Either source produces the same `IqamahTimes` value, so the menubar badge, popover row, widget
+and window card don't know or care which one produced it. The menubar shows one clock, never
+both: normally it counts down to the next Adhan, but the moment some prayer's Adhan passes with
+its Iqamah still ahead, the display retargets to that Iqamah instead of silently jumping to the
+*following* prayer's Adhan and dropping the one still coming up.
 
 ### Quran
 
@@ -289,6 +318,9 @@ Full detail in [PRIVACY.md](PRIVACY.md).
 - Qibla direction (bearing + compass)
 - Manual city override for when location is unavailable
 - Adhan audio at prayer time
+- Render JavaScript-heavy masjid pages (via a headless `WKWebView`) so the Iqamah scraper can
+  read sites it currently can't — deferred so far because it's heavier and slower per check than
+  a plain fetch, and "Minutes after Adhan" already covers the same masjids in the meantime
 
 ## Contributing
 

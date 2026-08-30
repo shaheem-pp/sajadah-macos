@@ -13,6 +13,7 @@ struct HomeView: View {
     @Environment(PrayerTimesStore.self) private var store
     @Environment(AppSettings.self) private var settings
     @Environment(PrayerLogStore.self) private var log
+    @Environment(IqamahStore.self) private var iqamah
 
     var body: some View {
         ScrollView {
@@ -23,6 +24,7 @@ struct HomeView: View {
                     today(day)
                 }
 
+                iqamahCard
                 streak
                 weekAhead
             }
@@ -82,6 +84,29 @@ struct HomeView: View {
                 )
             )
             .sajadahCard(padding: 8)
+        }
+    }
+
+    // MARK: Iqamah
+
+    /// Only appears once a masjid is configured in Settings — same opt-in rule as the widget.
+    /// These are static posted strings, not `Date`s, so unlike `today` there's no highlight or
+    /// tap-to-log control here, just the values as the masjid published them.
+    @ViewBuilder
+    private var iqamahCard: some View {
+        if let times = iqamah.times {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionHeader(title: "Iqamah", trailing: iqamah.sourceHost)
+
+                VStack(spacing: 2) {
+                    ForEach(DayLog.tracked, id: \.self) { prayer in
+                        if let value = times.time(for: prayer) {
+                            IqamahRow(prayer: prayer, value: value)
+                        }
+                    }
+                }
+                .sajadahCard(padding: 8)
+            }
         }
     }
 
@@ -208,6 +233,38 @@ private struct StreakStat: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// One posted Iqamah time. Echoes `PrayerRow`'s look (icon, name, time) without the
+/// highlight/passed/log-button machinery that only makes sense for a countdown-driven time.
+private struct IqamahRow: View {
+    let prayer: Prayer
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 11) {
+            Image(systemName: prayer.systemImage)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(prayer.tint)
+                .frame(width: 22, height: 22)
+                .background {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(prayer.tint.opacity(0.09))
+                }
+
+            Text(prayer.displayName)
+                .font(.system(size: 14))
+
+            Spacer(minLength: 12)
+
+            Text(value)
+                .font(.system(size: 14))
+                .monospacedDigit()
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 12)
+        .padding(.vertical, 7)
     }
 }
 

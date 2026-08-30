@@ -25,10 +25,18 @@ nonisolated struct DailyAyahCache: Codable, Sendable {
     let ayah: DailyAyah
 }
 
+nonisolated struct IqamahCacheFile: Codable, Sendable {
+    var times: IqamahTimes
+    /// nil when `times` was computed locally (offset mode) rather than scraped from a page.
+    var sourceURLString: String?
+    var fetchedAt: Date
+}
+
 nonisolated enum CacheFileName {
     static let prayerTimes = "prayer-cache.json"
     static let prayerLog = "prayer-log.json"
     static let dailyAyah = "quran/daily.json"
+    static let iqamah = "iqamah-cache.json"
 }
 
 // MARK: - Snapshot
@@ -42,6 +50,10 @@ nonisolated struct SajadahSnapshot: Sendable {
     var log: [String: DayLog] = [:]
     var placeName: String?
     var dailyAyah: DailyAyah?
+    var iqamah: IqamahTimes?
+    /// The host of whatever page `iqamah` was scraped from (e.g. "mwcanada.org") — a trust
+    /// caption for the widget, same idea as `placeName`.
+    var iqamahSourceHost: String?
 
     /// Sorted across every cached day, so the next-prayer search crosses midnight naturally.
     var events: [PrayerEvent] = []
@@ -88,6 +100,10 @@ nonisolated struct SajadahSnapshot: Sendable {
         snapshot.log = decode(CacheFileName.prayerLog) ?? [:]
         if let daily: DailyAyahCache = decode(CacheFileName.dailyAyah) {
             snapshot.dailyAyah = daily.ayah
+        }
+        if let cache: IqamahCacheFile = decode(CacheFileName.iqamah, isoDates: true) {
+            snapshot.iqamah = cache.times
+            snapshot.iqamahSourceHost = cache.sourceURLString.flatMap { URL(string: $0)?.host }
         }
         snapshot.events = snapshot.days.values
             .flatMap(\.events)

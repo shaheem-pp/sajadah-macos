@@ -20,6 +20,7 @@ struct SajadahWidgetBundle: WidgetBundle {
     var body: some Widget {
         NextPrayerWidget()
         PrayerTimesWidget()
+        IqamahWidget()
         StreakWidget()
         AyahWidget()
     }
@@ -210,6 +211,95 @@ struct PrayerTimesView: View {
         } else {
             WidgetEmptyView(message: "Open Sajadah to load prayer times.")
         }
+    }
+}
+
+// MARK: - Masjid Iqamah times
+
+struct IqamahWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "IqamahTimes", provider: SajadahProvider()) { entry in
+            IqamahWidgetView(entry: entry)
+                .containerBackground(for: .widget) { LatticeBackground() }
+                .widgetURL(SajadahLink.today)
+        }
+        .configurationDisplayName("Masjid Iqamah Times")
+        .description("Congregation prayer times for your local masjid, as posted on its website.")
+        .supportedFamilies([.systemMedium, .systemLarge])
+    }
+}
+
+struct IqamahWidgetView: View {
+    let entry: SajadahEntry
+
+    var body: some View {
+        if let times = entry.snapshot.iqamah {
+            // Adhan times for the same day, paired in alongside Iqamah where available — nil
+            // once cached data is thin, in which case rows just fall back to Iqamah alone.
+            let day = entry.snapshot.today(at: entry.date)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 5) {
+                    RubElHizb()
+                        .fill(Theme.jade.opacity(0.55))
+                        .frame(width: 7, height: 7)
+                    Text("IQAMAH")
+                        .font(.system(size: 9, weight: .semibold))
+                        .tracking(1)
+                    Spacer(minLength: 6)
+                    if let host = entry.snapshot.iqamahSourceHost {
+                        Text(host)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.bottom, 1)
+
+                ForEach(DayLog.tracked, id: \.self) { prayer in
+                    if let value = times.time(for: prayer) {
+                        IqamahWidgetRow(label: prayer.displayName, athaan: day?.time(for: prayer), iqamah: value)
+                    }
+                }
+                if let jummah1 = times.jummah1 {
+                    IqamahWidgetRow(label: "1st Jummah", athaan: nil, iqamah: jummah1)
+                }
+                if let jummah2 = times.jummah2 {
+                    IqamahWidgetRow(label: "2nd Jummah", athaan: nil, iqamah: jummah2)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else {
+            WidgetEmptyView(message: "Set your masjid in Settings to see Iqamah times.")
+        }
+    }
+}
+
+/// One row: label, then Adhan → Iqamah when both are known — same "Adhan then Iqamah" pairing
+/// as the menubar badge, rather than showing Iqamah on its own with no anchor. Jummah has no
+/// Adhan counterpart, so `athaan` is simply nil for those two rows and only Iqamah shows.
+private struct IqamahWidgetRow: View {
+    let label: String
+    let athaan: Date?
+    /// A posted string, not a `Date` — see `IqamahTimes`.
+    let iqamah: String
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 4)
+            if let athaan {
+                Text(athaan, style: .time)
+                    .foregroundStyle(.secondary)
+            }
+            Text(iqamah)
+                .fontWeight(.medium)
+                .monospacedDigit()
+        }
+        .font(.caption)
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
     }
 }
 

@@ -16,6 +16,7 @@ struct MenuBarContentView: View {
     @Environment(LocationManager.self) private var location
     @Environment(PrayerLogStore.self) private var log
     @Environment(QuranStore.self) private var quran
+    @Environment(IqamahStore.self) private var iqamah
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.openWindow) private var openWindow
 
@@ -23,6 +24,7 @@ struct MenuBarContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             if let day = store.today {
                 hero
+                iqamahRow
                 timings(day)
                 streakRow
 
@@ -76,6 +78,37 @@ struct MenuBarContentView: View {
         let span = next.date.timeIntervalSince(current.date)
         guard span > 0 else { return nil }
         return store.now.timeIntervalSince(current.date) / span
+    }
+
+    // MARK: Iqamah
+
+    /// One line, not all five — the popover stays a glance deep. Uses `store.menuBar`'s already
+    /// resolved anchor prayer rather than `store.nextEvent` directly — those differ exactly
+    /// when some prayer's Adhan has passed but its Iqamah hasn't, and `nextEvent` alone would
+    /// silently skip ahead to the following prayer and drop the still-upcoming Iqamah. Only
+    /// appears once a masjid is configured in Settings.
+    @ViewBuilder
+    private var iqamahRow: some View {
+        if let prayer = store.menuBar.prayerCase, let value = iqamah.times?.time(for: prayer) {
+            HStack(spacing: 7) {
+                Image(systemName: "building.columns")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.jade)
+
+                Text("Iqamah")
+                    .fontWeight(.medium)
+
+                Spacer(minLength: 8)
+
+                Text(value)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .font(.system(size: 12))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Theme.wellFill, in: RoundedRectangle(cornerRadius: Theme.rowRadius, style: .continuous))
+        }
     }
 
     // MARK: Timings

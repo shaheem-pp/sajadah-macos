@@ -49,6 +49,9 @@ final class PrayerTimesStore {
     @ObservationIgnored private var sortedEvents: [PrayerEvent] = []
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var lastSeenDayKey: String?
+    /// The most recent Iqamah data `tick(_:iqamah:)` was handed, reused by `rebuildEvents()` so
+    /// a data refresh doesn't momentarily forget it until the next tick corrects it.
+    @ObservationIgnored private var lastIqamah: IqamahTimes?
     @ObservationIgnored private var settings: AppSettings?
     @ObservationIgnored private let api = AladhanAPI.shared
 
@@ -141,10 +144,13 @@ final class PrayerTimesStore {
 
     // MARK: Ticking
 
-    func tick(_ date: Date) {
+    /// `iqamah` is whatever `IqamahStore.times` currently holds — `PrayerTimesStore` doesn't
+    /// own or fetch it, just uses it to decide what the menubar should anchor on right now.
+    func tick(_ date: Date, iqamah: IqamahTimes?) {
         now = date
+        lastIqamah = iqamah
 
-        let content = MenuBarContent(next: nextEvent, at: date)
+        let content = makeMenuBarContent(at: date, iqamah: iqamah)
         if content != menuBar { menuBar = content }
 
         let dayKey = DayKey.make(for: date, in: displayTimeZone)
@@ -154,6 +160,44 @@ final class PrayerTimesStore {
             refresh()
             onEventsChanged?()
         }
+    }
+
+    /// `MenuBarContent` is `nonisolated` data and can't call the main-actor `TimeFormatting`
+    /// itself, so clock strings are formatted here, on the way in.
+    ///
+    /// Normally this counts down to the next Adhan. But once some prayer's Adhan has passed and
+    /// its Iqamah (per the masjid's posted time) hasn't, the display retargets to that Iqamah
+    /// instead — one clock at a time, never both, since only one is actually the thing to wait
+    /// for at any given moment.
+    private func makeMenuBarContent(at date: Date, iqamah: IqamahTimes?) -> MenuBarContent {
+        if let waiting = waitingForIqamah(at: date, iqamah: iqamah) {
+            return MenuBarContent(
+                icon: waiting.event.prayer.systemImage,
+                prayer: waiting.event.prayer.displayName,
+                countdown: MenuBarContent.countdownText(from: date, until: waiting.iqamahDate),
+                clockTime: TimeFormatting.clock(
+                    waiting.iqamahDate,
+                    use24Hour: settings?.use24HourClock ?? false,
+                    timeZone: displayTimeZone
+                ),
+                prayerCase: waiting.event.prayer,
+                moment: .iqamah
+            )
+        }
+
+        let next = nextEvent
+        let clockTime = next.map {
+            TimeFormatting.clock($0.date, use24Hour: settings?.use24HourClock ?? false, timeZone: displayTimeZone)
+        } ?? ""
+        return MenuBarContent(next: next, at: date, clockTime: clockTime)
+    }
+
+    private func waitingForIqamah(at date: Date, iqamah: IqamahTimes?) -> (event: PrayerEvent, iqamahDate: Date)? {
+        guard let current = currentEvent, current.prayer.isPrayer,
+              let iqamahDate = iqamah?.date(for: current.prayer, onSameDayAs: current.date, timeZone: displayTimeZone),
+              date < iqamahDate
+        else { return nil }
+        return (current, iqamahDate)
     }
 
     // MARK: Location
@@ -272,7 +316,7 @@ final class PrayerTimesStore {
 
     private func rebuildEvents() {
         sortedEvents = days.values.flatMap(\.events).sorted { $0.date < $1.date }
-        menuBar = MenuBarContent(next: nextEvent, at: now)
+        menuBar = makeMenuBarContent(at: now, iqamah: lastIqamah)
     }
 
     private func pruneOldDays() {
@@ -323,7 +367,7 @@ final class PrayerTimesStore {
     }
 
     private func handleWakeOrClockChange() {
-        tick(.now)
+        tick(.now, iqamah: lastIqamah)
         refresh()
         onEventsChanged?()
     }
