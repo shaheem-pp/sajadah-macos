@@ -5,15 +5,23 @@
 
 import SwiftUI
 
-/// The one thing the app exists to answer: which prayer is next, and how long is left.
+/// The one thing the app exists to answer, for whichever part of the day it currently is:
+/// how long until the Adhan, whether jamaah is still catchable, or how much of this prayer's
+/// window is left. `init(phase:...)` words each of those; everything here just renders it.
 ///
 /// The panel is washed in the light of that prayer's hour — pre-dawn indigo through to night
 /// blue — so the answer is legible from across the room before a single word is read. The
 /// lattice and the arch behind it are held near the floor of visibility on purpose; they are
 /// there to give the surface a texture, not to be looked at.
 struct NextPrayerHero: View {
+    /// Whose hour the panel is washed in. Not always the prayer being counted down to — a
+    /// finished day sits in Isha's night whatever comes next.
     let prayer: Prayer
+    /// The headline. Usually the prayer's name, but not for a day that is done.
+    let title: String
+    /// The big number, already a whole phrase: "in 6h 24m", "2h 53m left".
     let countdown: String
+    /// The supporting clock time, already labelled where it needs to be. May be empty.
     let clock: String
     var place: String?
     var hijri: String?
@@ -21,6 +29,11 @@ struct NextPrayerHero: View {
     /// How far the current window has run, 0...1. Nil when there is nothing to measure from.
     var progress: Double?
     var compact: Bool = false
+    var kicker: String = "NEXT PRAYER"
+    /// Draws a brighter edge on the panel. Reserved for the minutes before a jamaah, which is
+    /// the only moment in the day where being late is a different outcome rather than a
+    /// later one.
+    var isUrgent: Bool = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -31,10 +44,11 @@ struct NextPrayerHero: View {
         .clipShape(RoundedRectangle(cornerRadius: compact ? 12 : Theme.cardRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: compact ? 12 : Theme.cardRadius, style: .continuous)
-                .strokeBorder(.white.opacity(0.10), lineWidth: 1)
+                .strokeBorder(.white.opacity(isUrgent ? 0.55 : 0.10), lineWidth: isUrgent ? 1.6 : 1)
         }
+        .animation(.snappy(duration: 0.25), value: isUrgent)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(prayer.displayName) in \(countdown), at \(clock)")
+        .accessibilityLabel(clock.isEmpty ? "\(title), \(countdown)" : "\(title), \(countdown), \(clock)")
     }
 
     // MARK: Layers
@@ -77,7 +91,7 @@ struct NextPrayerHero: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: compact ? 6 : 10) {
             HStack(spacing: 6) {
-                Text("NEXT PRAYER")
+                Text(kicker)
                     .font(.system(size: compact ? 9.5 : 10.5, weight: .semibold))
                     .tracking(1.1)
                     .foregroundStyle(.white.opacity(0.70))
@@ -91,23 +105,29 @@ struct NextPrayerHero: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(prayer.displayName)
+                Text(title)
                     .font(.system(size: compact ? 26 : 38, weight: .semibold))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
 
                 HStack(alignment: .firstTextBaseline, spacing: 7) {
-                    Text("in \(countdown)")
+                    Text(countdown)
                         .font(.system(size: compact ? 14 : 18, weight: .medium))
                         .monospacedDigit()
                         .foregroundStyle(.white.opacity(0.92))
 
-                    Text("·")
-                        .foregroundStyle(.white.opacity(0.45))
+                    // A finished day past the end of the cached timings has no clock time to
+                    // show, and a lone separator would read as something failing to load.
+                    if !clock.isEmpty {
+                        Text("·")
+                            .foregroundStyle(.white.opacity(0.45))
 
-                    Text(clock)
-                        .font(.system(size: compact ? 13 : 16, weight: .regular))
-                        .monospacedDigit()
-                        .foregroundStyle(.white.opacity(0.75))
+                        Text(clock)
+                            .font(.system(size: compact ? 13 : 16, weight: .regular))
+                            .monospacedDigit()
+                            .foregroundStyle(.white.opacity(0.75))
+                    }
                 }
             }
 
@@ -158,5 +178,99 @@ struct NextPrayerHero: View {
         .foregroundStyle(.white.opacity(0.85))
         .lineLimit(1)
         .padding(.top, compact ? 1 : 3)
+    }
+}
+
+// MARK: - Wording each phase
+
+extension NextPrayerHero {
+
+    /// How close to a jamaah counts as "leave now" rather than "soon".
+    private static let urgentLead: TimeInterval = 15 * 60
+
+    /// Builds the panel from the day's phase. Every state is worded here and only here, so
+    /// two places rendering the same moment can't describe it differently.
+    ///
+    /// Fails on `.unavailable`: with no timings there is no panel to draw, and an empty one
+    /// would sit at the top of the window pretending otherwise.
+    init?(
+        phase: DayPhase,
+        now: Date,
+        use24Hour: Bool,
+        timeZone: TimeZone,
+        place: String?,
+        hijri: String?,
+        isStale: Bool = false,
+        compact: Bool = false
+    ) {
+        func at(_ date: Date) -> String {
+            TimeFormatting.clock(date, use24Hour: use24Hour, timeZone: timeZone)
+        }
+        func left(until date: Date) -> String {
+            TimeFormatting.countdown(date.timeIntervalSince(now))
+        }
+
+        switch phase {
+        case .awaitingAdhan(let next):
+            self.prayer = next.prayer
+            self.kicker = "NEXT PRAYER"
+            self.title = next.prayer.displayName
+            self.countdown = "in \(left(until: next.date))"
+            self.clock = at(next.date)
+            // Nothing named to measure from between windows, so no bar rather than a bar
+            // spanning a gap the user couldn't name.
+            self.progress = nil
+            self.isUrgent = false
+
+        case .awaitingIqamah(let prayer, let adhan, let iqamah):
+            self.prayer = prayer
+            self.kicker = "AT THE MASJID"
+            self.title = "\(prayer.displayName) jamaah"
+            self.countdown = "in \(left(until: iqamah))"
+            self.clock = at(iqamah)
+            self.progress = Self.fraction(from: adhan, to: iqamah, at: now)
+            self.isUrgent = iqamah.timeIntervalSince(now) <= Self.urgentLead
+
+        case .inWindow(let prayer, let adhan, let closesAt):
+            self.prayer = prayer
+            self.kicker = "IN THE WINDOW"
+            self.title = prayer.displayName
+            self.countdown = "\(left(until: closesAt)) left"
+            self.clock = "until \(at(closesAt))"
+            self.progress = Self.fraction(from: adhan, to: closesAt, at: now)
+            self.isUrgent = false
+
+        case .dayComplete(let next):
+            // The wash stays in Isha's night whatever comes next — the day being over is what
+            // the panel is saying, not that Fajr is coming.
+            self.prayer = .isha
+            self.kicker = "DAY COMPLETE"
+            self.title = "All five prayed"
+            if let next {
+                self.countdown = "\(next.prayer.displayName) in \(left(until: next.date))"
+                self.clock = at(next.date)
+            } else {
+                self.countdown = "Tomorrow's times aren't loaded yet"
+                self.clock = ""
+            }
+            self.progress = nil
+            self.isUrgent = false
+
+        case .unavailable:
+            return nil
+        }
+
+        self.place = place
+        self.hijri = hijri
+        self.isStale = isStale
+        self.compact = compact
+    }
+
+    /// How far `now` has run between two instants, clamped. Nil for a span with no width,
+    /// which at extreme latitudes is a real possibility rather than a defensive guard.
+    private static func fraction(from start: Date, to end: Date, at now: Date) -> Double? {
+        let span = end.timeIntervalSince(start)
+        guard span > 0 else { return nil }
+        return min(max(now.timeIntervalSince(start) / span, 0), 1)
     }
 }

@@ -118,6 +118,48 @@ final class PrayerTimesStore {
         DayKey.make(for: now, in: displayTimeZone)
     }
 
+    /// The day's timings an instant falls inside, by the display timezone's calendar day.
+    private func day(containing date: Date) -> DayTimings? {
+        days[DayKey.make(for: date, in: displayTimeZone)]
+    }
+
+    // MARK: Day phase
+
+    /// Where the clock sits in the day right now — see `DayPhase`.
+    ///
+    /// `iqamah` and `dayIsComplete` are handed in rather than read: this store owns neither the
+    /// masjid scrape nor the user's log. Taking them as arguments keeps those dependencies
+    /// visible to a reader, and to SwiftUI's observation at the call site.
+    func phase(iqamah: IqamahTimes?, dayIsComplete: Bool) -> DayPhase {
+        guard !sortedEvents.isEmpty else { return .unavailable }
+
+        // An answered day outranks everything else. It can't be reached early: a prayer is
+        // only loggable once its own time has come.
+        if dayIsComplete { return .dayComplete(next: nextEvent) }
+
+        // The same test the menubar retargets on, so the two can't disagree about whether a
+        // jamaah is still ahead.
+        if let waiting = waitingForIqamah(at: now, iqamah: iqamah) {
+            return .awaitingIqamah(
+                prayer: waiting.event.prayer,
+                adhan: waiting.event.date,
+                iqamah: waiting.iqamahDate
+            )
+        }
+
+        // `currentEvent` can belong to yesterday — at 3am it's yesterday's Isha — which is
+        // exactly why the window close is looked up on that event's own day rather than today's.
+        let cutoff = settings?.ishaCutoffMinutes ?? AppSettings.defaultIshaCutoffMinutes
+        if let current = currentEvent,
+           let day = day(containing: current.date),
+           let close = day.windowClose(for: current.prayer, ishaCutoffMinutes: cutoff),
+           now < close {
+            return .inWindow(prayer: current.prayer, adhan: current.date, closesAt: close)
+        }
+
+        return nextEvent.map { .awaitingAdhan(next: $0) } ?? .unavailable
+    }
+
     /// Upcoming window closes, which is where check-in questions hang off.
     func upcomingCheckIns(limitDays: Int, ishaCutoffMinutes: Int) -> [PrayerCheckIn] {
         let horizon = now.addingTimeInterval(Double(limitDays) * 86_400)

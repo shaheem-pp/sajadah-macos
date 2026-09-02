@@ -80,6 +80,8 @@ final class AppSettings {
 
     /// Minutes from local midnight at which Isha's window is treated as closed. Isha has no
     /// following prayer, so without this there is nothing to hang its check-in on.
+    static let defaultIshaCutoffMinutes = 23 * 60
+
     var ishaCutoffMinutes: Int {
         didSet {
             guard ishaCutoffMinutes != oldValue else { return }
@@ -260,7 +262,7 @@ final class AppSettings {
         reminderOffsetMinutes = defaults.object(forKey: Key.reminderOffsetMinutes) as? Int ?? 0
         checkInsEnabled = defaults.object(forKey: Key.checkInsEnabled) as? Bool ?? true
         checkInOffsetMinutes = defaults.object(forKey: Key.checkInOffsetMinutes) as? Int ?? 10
-        ishaCutoffMinutes = defaults.object(forKey: Key.ishaCutoffMinutes) as? Int ?? (23 * 60)
+        ishaCutoffMinutes = defaults.object(forKey: Key.ishaCutoffMinutes) as? Int ?? Self.defaultIshaCutoffMinutes
         translationEdition = defaults.string(forKey: Key.translationEdition) ?? QuranTranslation.defaultID
         arabicFontName = defaults.string(forKey: Key.arabicFontName) ?? ArabicFontChoice.defaultID
         arabicFontSize = defaults.object(forKey: Key.arabicFontSize) as? Double ?? 26

@@ -16,15 +16,21 @@ struct HomeView: View {
     @Environment(IqamahStore.self) private var iqamah
 
     var body: some View {
-        ScrollView {
+        // Derived once and handed down: the panel and the table have to be describing the
+        // same moment, and asking twice invites them to drift a tick apart.
+        let phase = store.phase(
+            iqamah: iqamah.times,
+            dayIsComplete: log.isComplete(store.todayKey)
+        )
+
+        return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                hero
+                hero(phase)
 
                 if let day = store.today {
-                    today(day)
+                    today(day, phase: phase)
                 }
 
-                iqamahCard
                 streak
                 weekAhead
             }
@@ -38,75 +44,105 @@ struct HomeView: View {
 
     // MARK: Hero
 
+    /// The panel words itself from the phase — waiting for an Adhan, waiting for a jamaah,
+    /// inside a window, or done for the day.
     @ViewBuilder
-    private var hero: some View {
-        if let next = store.nextEvent, let remaining = store.timeUntilNextEvent {
-            NextPrayerHero(
-                prayer: next.prayer,
-                countdown: TimeFormatting.countdown(remaining),
-                clock: TimeFormatting.clock(
-                    next.date,
-                    use24Hour: settings.use24HourClock,
-                    timeZone: store.displayTimeZone
-                ),
-                place: store.placeName ?? "Current location",
-                hijri: store.hijriDateText,
-                isStale: store.isStale,
-                progress: windowProgress
-            )
+    private func hero(_ phase: DayPhase) -> some View {
+        if let panel = NextPrayerHero(
+            phase: phase,
+            now: store.now,
+            use24Hour: settings.use24HourClock,
+            timeZone: store.displayTimeZone,
+            place: store.placeName ?? "Current location",
+            hijri: store.hijriDateText,
+            isStale: store.isStale
+        ) {
+            panel
         }
-    }
-
-    /// How much of the gap between the last timing and the next one has elapsed. Nil rather
-    /// than zero when there is no previous event to measure from, so the bar disappears
-    /// instead of reading as "no time has passed".
-    private var windowProgress: Double? {
-        guard let current = store.currentEvent, let next = store.nextEvent else { return nil }
-        let span = next.date.timeIntervalSince(current.date)
-        guard span > 0 else { return nil }
-        return store.now.timeIntervalSince(current.date) / span
     }
 
     // MARK: Today
 
-    private func today(_ day: DayTimings) -> some View {
+    private func today(_ day: DayTimings, phase: DayPhase) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: "Today", trailing: "\(log.prayedCount(on: store.todayKey)) of \(DayLog.tracked.count) prayed")
 
-            PrayerListView(
-                day: day,
-                highlighted: store.nextEvent?.prayer,
-                passedBefore: store.now,
-                use24Hour: settings.use24HourClock,
-                logging: PrayerLogging(
-                    state: { log.state(for: $0, on: store.todayKey) },
-                    cycle: { log.cycle($0, on: store.todayKey) }
+            VStack(spacing: 0) {
+                PrayerListView(
+                    day: day,
+                    highlighted: Self.highlighted(for: phase),
+                    passedBefore: store.now,
+                    use24Hour: settings.use24HourClock,
+                    // Nil until a masjid is configured, which keeps the list single-column —
+                    // the same opt-in rule the widget uses.
+                    iqamah: iqamah.times,
+                    iqamahSource: iqamahSourceCaption,
+                    logging: PrayerLogging(
+                        state: { log.state(for: $0, on: store.todayKey) },
+                        cycle: { log.cycle($0, on: store.todayKey) }
+                    )
                 )
-            )
+
+                if iqamah.times == nil {
+                    masjidInvite
+                }
+            }
             .sajadahCard(padding: 8)
         }
     }
 
-    // MARK: Iqamah
+    /// What the Jamaah column says about where its times came from. A scraped page is named by
+    /// its host; computed times have no source to name, so they say what they are instead.
+    private var iqamahSourceCaption: String? {
+        guard iqamah.times != nil else { return nil }
+        return switch settings.iqamahSourceMode {
+        case .website: iqamah.sourceHost
+        case .offset: "after Adhan"
+        }
+    }
 
-    /// Only appears once a masjid is configured in Settings — same opt-in rule as the widget.
-    /// These are static posted strings, not `Date`s, so unlike `today` there's no highlight or
-    /// tap-to-log control here, just the values as the masjid published them.
-    @ViewBuilder
-    private var iqamahCard: some View {
-        if let times = iqamah.times {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeader(title: "Iqamah", trailing: iqamah.sourceHost)
+    /// Until a masjid is set the Jamaah column simply isn't there, and nothing anywhere says
+    /// it could be. The invite goes in the column's own place rather than in Settings, so the
+    /// feature asks for itself where its answer would appear.
+    private var masjidInvite: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "building.columns")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.jade)
 
-                VStack(spacing: 2) {
-                    ForEach(DayLog.tracked, id: \.self) { prayer in
-                        if let value = times.time(for: prayer) {
-                            IqamahRow(prayer: prayer, value: value)
-                        }
-                    }
-                }
-                .sajadahCard(padding: 8)
+            Text("Add your masjid to see its jamaah times here.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 8)
+
+            SettingsLink {
+                Text("Set Up…")
             }
+            .controlSize(.small)
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 6)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Theme.hairline)
+                .frame(height: 1)
+                .padding(.horizontal, 2)
+        }
+    }
+
+    /// Which row to call out. Inside a window — and especially while its jamaah is still
+    /// ahead — that's the prayer you are currently in, not the one after it, so the table
+    /// marks the same prayer the panel above is counting down to. A finished day marks
+    /// nothing: there is no longer a row waiting on you.
+    private static func highlighted(for phase: DayPhase) -> Prayer? {
+        switch phase {
+        case .awaitingAdhan(let next): next.prayer
+        case .awaitingIqamah(let prayer, _, _): prayer
+        case .inWindow(let prayer, _, _): prayer
+        case .dayComplete, .unavailable: nil
         }
     }
 
@@ -233,38 +269,6 @@ private struct StreakStat: View {
                     .foregroundStyle(.secondary)
             }
         }
-    }
-}
-
-/// One posted Iqamah time. Echoes `PrayerRow`'s look (icon, name, time) without the
-/// highlight/passed/log-button machinery that only makes sense for a countdown-driven time.
-private struct IqamahRow: View {
-    let prayer: Prayer
-    let value: String
-
-    var body: some View {
-        HStack(spacing: 11) {
-            Image(systemName: prayer.systemImage)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(prayer.tint)
-                .frame(width: 22, height: 22)
-                .background {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(prayer.tint.opacity(0.09))
-                }
-
-            Text(prayer.displayName)
-                .font(.system(size: 14))
-
-            Spacer(minLength: 12)
-
-            Text(value)
-                .font(.system(size: 14))
-                .monospacedDigit()
-        }
-        .padding(.leading, 10)
-        .padding(.trailing, 12)
-        .padding(.vertical, 7)
     }
 }
 

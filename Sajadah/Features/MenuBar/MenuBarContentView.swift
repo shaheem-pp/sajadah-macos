@@ -54,7 +54,8 @@ struct MenuBarContentView: View {
         if let next = store.nextEvent, let remaining = store.timeUntilNextEvent {
             NextPrayerHero(
                 prayer: next.prayer,
-                countdown: TimeFormatting.countdown(remaining),
+                title: next.prayer.displayName,
+                countdown: "in \(TimeFormatting.countdown(remaining))",
                 clock: TimeFormatting.clock(
                     next.date,
                     use24Hour: settings.use24HourClock,

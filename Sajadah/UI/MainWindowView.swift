@@ -21,6 +21,17 @@ struct MainWindowView: View {
         } detail: {
             detail
         }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                // The popover has had a gear all along; the window hasn't, which left ⌘, and
+                // the app menu as the only way in from here. The tooltip names the shortcut so
+                // the button teaches the thing that eventually replaces it.
+                SettingsLink {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("Sajadah Settings (⌘,)")
+            }
+        }
         .task { quran.loadSurahList() }
     }
 

@@ -14,6 +14,10 @@ struct PrayerLogging {
 
 /// One day's timings as rows. Shared by the menubar popover and the main window so the two
 /// can't drift apart.
+///
+/// With `iqamah` supplied the list grows a second time column and a heading row: Adhan and
+/// jamaah are the same five prayers, and reading one against the other is the whole question
+/// ("how long until I have to leave"), which two separate cards made into arithmetic.
 struct PrayerListView: View {
     let day: DayTimings
     /// The prayer to call out — normally the next one up.
@@ -21,11 +25,23 @@ struct PrayerListView: View {
     /// Timings before this instant are dimmed as "already passed".
     var passedBefore: Date?
     var use24Hour: Bool = false
+    /// The masjid's posted congregation times, when one is configured. Nil keeps the list
+    /// single-column, which is what the popover wants at 300pt wide.
+    var iqamah: IqamahTimes?
+    /// Where those times came from, captioned under the Jamaah heading — a masjid host, so
+    /// the column says whose times these are without a card of its own to say it in.
+    var iqamahSource: String?
     var logging: PrayerLogging?
     var compact: Bool = false
 
+    private var showsIqamah: Bool { iqamah != nil }
+
     var body: some View {
         VStack(spacing: 2) {
+            if showsIqamah {
+                header
+            }
+
             ForEach(day.events) { event in
                 PrayerRow(
                     event: event,
@@ -33,12 +49,70 @@ struct PrayerListView: View {
                     hasPassed: passedBefore.map { event.date < $0 } ?? false,
                     use24Hour: use24Hour,
                     timeZone: day.timeZone,
+                    // Only sunrise has no congregation, and it reads better as an empty cell
+                    // than as a dash — nothing is missing, there is simply nothing to hold.
+                    iqamahValue: iqamah?.time(for: event.prayer),
+                    showsIqamahColumn: showsIqamah,
                     logging: logging,
                     compact: compact
                 )
             }
         }
     }
+
+    private var header: some View {
+        HStack(spacing: compact ? 9 : 11) {
+            Color.clear
+                .frame(width: compact ? 20 : 22, height: 1)
+
+            Spacer(minLength: 12)
+
+            Text("Adhan")
+                .frame(width: PrayerColumn.adhan, alignment: .trailing)
+
+            VStack(alignment: .trailing, spacing: 1) {
+                Text("Jamaah")
+                if let iqamahSource {
+                    // The caption is also the way back to where these times are configured.
+                    // A column that says whose times it holds is the natural place to look
+                    // when you want to change whose times it holds.
+                    SettingsLink {
+                        Text(iqamahSource)
+                            .font(.system(size: 9))
+                            .textCase(nil)
+                            .tracking(0)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    .buttonStyle(.plain)
+                    .pointerStyle(.link)
+                    .help("Change where jamaah times come from")
+                }
+            }
+            .frame(width: PrayerColumn.iqamah, alignment: .trailing)
+
+            if logging != nil {
+                Color.clear.frame(width: PrayerColumn.log, height: 1)
+            }
+        }
+        .font(.system(size: 9.5, weight: .semibold))
+        .tracking(0.7)
+        .textCase(.uppercase)
+        .foregroundStyle(.tertiary)
+        .padding(.leading, compact ? 8 : 10)
+        .padding(.trailing, compact ? 8 : 12)
+        .padding(.top, 3)
+        .padding(.bottom, 4)
+    }
+}
+
+/// Fixed widths so the two time columns and the heading above them stay in line. Only applied
+/// when there are two columns to align — a single-column list keeps its natural layout.
+private enum PrayerColumn {
+    static let adhan: CGFloat = 76
+    static let iqamah: CGFloat = 84
+    static let log: CGFloat = 16
 }
 
 private struct PrayerRow: View {
@@ -47,6 +121,8 @@ private struct PrayerRow: View {
     let hasPassed: Bool
     let use24Hour: Bool
     let timeZone: TimeZone
+    let iqamahValue: String?
+    let showsIqamahColumn: Bool
     let logging: PrayerLogging?
     let compact: Bool
 
@@ -64,14 +140,33 @@ private struct PrayerRow: View {
                 .font(.system(size: compact ? 13 : 14, weight: isHighlighted ? .semibold : .regular))
                 .monospacedDigit()
                 .foregroundStyle(foreground)
+                .frame(width: showsIqamahColumn ? PrayerColumn.adhan : nil, alignment: .trailing)
 
-            if let logging, event.prayer.isPrayer {
-                LogButton(
-                    state: logging.state(event.prayer),
-                    // A prayer can only be logged once its time has actually come.
-                    isEnabled: hasPassed,
-                    action: { logging.cycle(event.prayer) }
-                )
+            if showsIqamahColumn {
+                // Posted verbatim: these are strings off a masjid's own page, not times
+                // Sajadah computed, and some of them are words ("Sunset") rather than clocks.
+                // Sat beside the Adhan they finally mean something without being rewritten.
+                Text(iqamahValue ?? "")
+                    .font(.system(size: compact ? 13 : 14, weight: isHighlighted ? .semibold : .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(iqamahForeground)
+                    .lineLimit(1)
+                    .frame(width: PrayerColumn.iqamah, alignment: .trailing)
+            }
+
+            if logging != nil {
+                if event.prayer.isPrayer, let logging {
+                    LogButton(
+                        state: logging.state(event.prayer),
+                        // A prayer can only be logged once its time has actually come.
+                        isEnabled: hasPassed,
+                        action: { logging.cycle(event.prayer) }
+                    )
+                } else {
+                    // Sunrise is never logged, but it still has to hold the column open or
+                    // its times sit further right than everything above and below them.
+                    Color.clear.frame(width: PrayerColumn.log, height: PrayerColumn.log)
+                }
             }
         }
         .padding(.leading, compact ? 8 : 10)
@@ -118,6 +213,13 @@ private struct PrayerRow: View {
         if isHighlighted { return .primary }
         if hasPassed || !event.prayer.isPrayer { return .secondary }
         return .primary
+    }
+
+    /// The jamaah time is the actionable one, so it holds its weight a step longer than the
+    /// Adhan beside it — but a passed row still settles back with the rest.
+    private var iqamahForeground: Color {
+        if isHighlighted { return .primary }
+        return hasPassed ? .secondary : .primary
     }
 }
 
