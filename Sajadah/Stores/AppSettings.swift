@@ -58,9 +58,30 @@ final class AppSettings {
         }
     }
 
+    // MARK: Iqamah reminders
+
+    /// Whether to be reminded shortly before the masjid's congregation time. Does nothing
+    /// until a masjid is configured under Settings → Masjid.
+    var iqamahRemindersEnabled: Bool {
+        didSet {
+            guard iqamahRemindersEnabled != oldValue else { return }
+            defaults.set(iqamahRemindersEnabled, forKey: Key.iqamahRemindersEnabled)
+            onNotificationPreferencesChanged?()
+        }
+    }
+
+    /// Minutes *before* Iqamah to fire that reminder — long enough to still get there.
+    var iqamahReminderOffsetMinutes: Int {
+        didSet {
+            guard iqamahReminderOffsetMinutes != oldValue else { return }
+            defaults.set(iqamahReminderOffsetMinutes, forKey: Key.iqamahReminderOffsetMinutes)
+            onNotificationPreferencesChanged?()
+        }
+    }
+
     // MARK: Check-ins
 
-    /// Whether to ask "did you pray X?" as each prayer's window closes.
+    /// Whether to ask "did you pray X?" after each Adhan, and again as the window closes.
     var checkInsEnabled: Bool {
         didSet {
             guard checkInsEnabled != oldValue else { return }
@@ -69,11 +90,12 @@ final class AppSettings {
         }
     }
 
-    /// How long before the window closes the first, soft ask arrives.
-    var checkInOffsetMinutes: Int {
+    /// How long after the Adhan the first ask arrives. Asking here rather than hours later,
+    /// near the window close, means the question lands while the answer is still obvious.
+    var checkInAfterAdhanMinutes: Int {
         didSet {
-            guard checkInOffsetMinutes != oldValue else { return }
-            defaults.set(checkInOffsetMinutes, forKey: Key.checkInOffsetMinutes)
+            guard checkInAfterAdhanMinutes != oldValue else { return }
+            defaults.set(checkInAfterAdhanMinutes, forKey: Key.checkInAfterAdhanMinutes)
             onNotificationPreferencesChanged?()
         }
     }
@@ -126,6 +148,25 @@ final class AppSettings {
         didSet {
             guard fridayKahfReminder != oldValue else { return }
             defaults.set(fridayKahfReminder, forKey: Key.fridayKahfReminder)
+            onNotificationPreferencesChanged?()
+        }
+    }
+
+    /// A daily nudge to read, separate from the Friday Al-Kahf one. Off by default — an
+    /// unasked-for daily notification is the fastest way to get the app muted entirely.
+    var quranReminderEnabled: Bool {
+        didSet {
+            guard quranReminderEnabled != oldValue else { return }
+            defaults.set(quranReminderEnabled, forKey: Key.quranReminderEnabled)
+            onNotificationPreferencesChanged?()
+        }
+    }
+
+    /// Minutes from local midnight for the daily reading reminder.
+    var quranReminderMinutes: Int {
+        didSet {
+            guard quranReminderMinutes != oldValue else { return }
+            defaults.set(quranReminderMinutes, forKey: Key.quranReminderMinutes)
             onNotificationPreferencesChanged?()
         }
     }
@@ -260,8 +301,10 @@ final class AppSettings {
             .map { Set($0.compactMap(Prayer.init(rawValue:))) }
             ?? Set(Prayer.allCases.filter(\.isPrayer))
         reminderOffsetMinutes = defaults.object(forKey: Key.reminderOffsetMinutes) as? Int ?? 0
+        iqamahRemindersEnabled = defaults.object(forKey: Key.iqamahRemindersEnabled) as? Bool ?? true
+        iqamahReminderOffsetMinutes = defaults.object(forKey: Key.iqamahReminderOffsetMinutes) as? Int ?? 10
         checkInsEnabled = defaults.object(forKey: Key.checkInsEnabled) as? Bool ?? true
-        checkInOffsetMinutes = defaults.object(forKey: Key.checkInOffsetMinutes) as? Int ?? 10
+        checkInAfterAdhanMinutes = defaults.object(forKey: Key.checkInAfterAdhanMinutes) as? Int ?? 15
         ishaCutoffMinutes = defaults.object(forKey: Key.ishaCutoffMinutes) as? Int ?? Self.defaultIshaCutoffMinutes
         translationEdition = defaults.string(forKey: Key.translationEdition) ?? QuranTranslation.defaultID
         arabicFontName = defaults.string(forKey: Key.arabicFontName) ?? ArabicFontChoice.defaultID
@@ -269,6 +312,8 @@ final class AppSettings {
         translationFontSize = defaults.object(forKey: Key.translationFontSize) as? Double ?? 13
         fridayKahfReminder = defaults.object(forKey: Key.fridayKahfReminder) as? Bool ?? true
         fridayKahfMinutes = defaults.object(forKey: Key.fridayKahfMinutes) as? Int ?? (9 * 60)
+        quranReminderEnabled = defaults.object(forKey: Key.quranReminderEnabled) as? Bool ?? false
+        quranReminderMinutes = defaults.object(forKey: Key.quranReminderMinutes) as? Int ?? (20 * 60)
         use24HourClock = defaults.object(forKey: Key.use24HourClock) as? Bool ?? false
         launchAtLogin = SMAppService.mainApp.status == .enabled
         iqamahSourceMode = (defaults.string(forKey: Key.iqamahSourceMode)).flatMap(IqamahSourceMode.init(rawValue:))
@@ -285,6 +330,18 @@ final class AppSettings {
 
     func isNotificationEnabled(for prayer: Prayer) -> Bool {
         prayer.isPrayer && enabledPrayers.contains(prayer)
+    }
+
+    /// The five offsets as one value, so callers that want the rule rather than five separate
+    /// numbers — `IqamahSchedule`, chiefly — don't have to reassemble it themselves.
+    var iqamahOffsets: [Prayer: Int] {
+        [
+            .fajr: iqamahOffsetFajr,
+            .dhuhr: iqamahOffsetDhuhr,
+            .asr: iqamahOffsetAsr,
+            .maghrib: iqamahOffsetMaghrib,
+            .isha: iqamahOffsetIsha,
+        ]
     }
 
     func setNotificationEnabled(_ enabled: Bool, for prayer: Prayer) {
@@ -318,8 +375,10 @@ final class AppSettings {
         static let notificationsEnabled = "notificationsEnabled"
         static let enabledPrayers = "enabledPrayers"
         static let reminderOffsetMinutes = "reminderOffsetMinutes"
+        static let iqamahRemindersEnabled = "iqamahRemindersEnabled"
+        static let iqamahReminderOffsetMinutes = "iqamahReminderOffsetMinutes"
         static let checkInsEnabled = "checkInsEnabled"
-        static let checkInOffsetMinutes = "checkInOffsetMinutes"
+        static let checkInAfterAdhanMinutes = "checkInAfterAdhanMinutes"
         static let ishaCutoffMinutes = "ishaCutoffMinutes"
         static let translationEdition = "translationEdition"
         static let arabicFontName = "arabicFontName"
@@ -327,6 +386,8 @@ final class AppSettings {
         static let translationFontSize = "translationFontSize"
         static let fridayKahfReminder = "fridayKahfReminder"
         static let fridayKahfMinutes = "fridayKahfMinutes"
+        static let quranReminderEnabled = "quranReminderEnabled"
+        static let quranReminderMinutes = "quranReminderMinutes"
         static let use24HourClock = "use24HourClock"
         static let iqamahSourceMode = "iqamahSourceMode"
         static let masjidURL = "masjidURL"

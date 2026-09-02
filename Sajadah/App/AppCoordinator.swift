@@ -3,6 +3,7 @@
 //  Sajadah
 //
 
+import AppKit
 import Foundation
 import Observation
 import SwiftUI
@@ -32,6 +33,11 @@ final class AppCoordinator {
         // Application Support, and would otherwise look like a lost prayer log and streak.
         AppFiles.migrateFromApplicationSupportIfNeeded()
 
+        // Widgets on an unsigned build read a mirror of the cache rather than the App Group
+        // container macOS won't let them touch. Cache writes keep it current, but a Mac that
+        // already has today's timings won't do one — so seed it at launch too.
+        AppFiles.refreshWidgetMirror()
+
         // Before any view renders, or the reader's first frame falls back to a UI font.
         BundledFonts.registerAll()
 
@@ -55,7 +61,10 @@ final class AppCoordinator {
         settings.onIqamahSourceChanged = { [iqamah] in
             iqamah.refresh()
         }
-        iqamah.onTimesChanged = {
+        iqamah.onTimesChanged = { [weak self] in
+            // Iqamah reminders are scheduled from these times, so a masjid change has to reach
+            // the scheduler and not just the widgets.
+            self?.rescheduleNotifications()
             WidgetCenter.shared.reloadAllTimelines()
         }
         // Logging a prayer retires its outstanding questions: the reschedule below rebuilds
@@ -75,16 +84,42 @@ final class AppCoordinator {
             quran.invalidateTexts()
         }
 
-        ticker = Ticker { [store, quran, iqamah] date in
+        ticker = Ticker(countdownTarget: { [store] in store.menuBarTarget }) { [weak self, store, quran, iqamah] date in
             store.tick(date, iqamah: iqamah.times)
             // Follows the same day boundary the prayer times use, so the verse turns over
             // with everything else rather than at the Mac's midnight.
             quran.refreshDailyAyah(dayKey: store.todayKey)
             iqamah.tick(date)
+            self?.topUpNotificationsIfStale(at: date)
         }
         ticker?.start()
 
+        // Sajadah is a menubar app: no window open, no Dock icon.
+        DockVisibility.start()
+
+        observeActivation()
+
         Task { [weak self] in await self?.start() }
+    }
+
+    /// Re-checks notification permission whenever the app comes forward.
+    ///
+    /// Someone who turns Sajadah's notifications back on in System Settings never comes back
+    /// through the app's own prompt, so without this the scheduler would keep believing it was
+    /// denied until the next launch.
+    private func observeActivation() {
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let before = self.scheduler.authorization
+                await self.scheduler.refreshAuthorization()
+                if self.scheduler.authorization != before { self.rescheduleNotifications() }
+            }
+        }
     }
 
     private func start() async {
@@ -103,25 +138,85 @@ final class AppCoordinator {
 
         await scheduler.requestAuthorizationIfNeeded()
         rescheduleNotifications()
-        await scheduler.updateFridayKahfReminder(settings: settings)
     }
 
-    private func rescheduleNotifications() {
-        Task { [scheduler, store, settings, log] in
-            // Questions already answered are never asked again.
-            let checkIns = store
-                .upcomingCheckIns(limitDays: 3, ishaCutoffMinutes: settings.ishaCutoffMinutes)
-                .filter { log.state(for: $0.prayer, on: $0.dayKey) == nil }
+    // MARK: Notifications
 
-            await scheduler.reschedule(
-                events: store.upcomingEvents(limitDays: 7),
-                checkIns: checkIns,
-                settings: settings,
-                placeName: store.placeName
-            )
-            // Repeating, so it lives outside the rebuild above and must be reapplied here.
-            await scheduler.updateFridayKahfReminder(settings: settings)
+    /// How far ahead notifications are scheduled. Three kinds per prayer plus the closing ask
+    /// is around twenty a day against macOS's 64-request budget, so a longer horizon would only
+    /// build candidates that get trimmed away unscheduled.
+    private static let scheduleHorizonDays = 3
+
+    /// How long the batch may go untouched before the ticker rebuilds it anyway.
+    private static let scheduleTopUpInterval: TimeInterval = 30 * 60
+
+    @ObservationIgnored private var rescheduleTask: Task<Void, Never>?
+    @ObservationIgnored private var lastRescheduledAt: Date?
+
+    /// Rebuilds the pending notifications, coalescing bursts.
+    ///
+    /// Dragging a stepper in Settings fires this on every step, and each rebuild is several
+    /// round trips to the notification daemon. The short delay collapses that into one pass;
+    /// the scheduler serialises whatever still overlaps.
+    private func rescheduleNotifications() {
+        rescheduleTask?.cancel()
+        rescheduleTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, let self else { return }
+            await performReschedule()
         }
+    }
+
+    private func performReschedule() async {
+        lastRescheduledAt = .now
+
+        // Questions already answered are never asked again.
+        let checkIns = store.upcomingCheckIns(
+            limitDays: Self.scheduleHorizonDays,
+            ishaCutoffMinutes: settings.ishaCutoffMinutes
+        )
+        let prayers = store.upcomingPrayers(
+            limitDays: Self.scheduleHorizonDays,
+            iqamah: iqamahSchedule
+        )
+        var answered: Set<String> = []
+        for prayer in prayers where log.state(for: prayer.prayer, on: prayer.dayKey) != nil {
+            answered.insert(prayer.id)
+        }
+        for checkIn in checkIns where log.state(for: checkIn.prayer, on: checkIn.dayKey) != nil {
+            answered.insert(checkIn.id)
+        }
+
+        await scheduler.reschedule(
+            prayers: prayers,
+            checkIns: checkIns,
+            answered: answered,
+            settings: settings,
+            placeName: store.placeName,
+            surah: reading.lastRead?.surah ?? 1
+        )
+    }
+
+    /// The rule Iqamah times follow, rather than today's computed result — the scheduler needs
+    /// tomorrow's jamaah too, and in offset mode `IqamahStore.times` only ever describes today.
+    private var iqamahSchedule: IqamahSchedule? {
+        switch settings.iqamahSourceMode {
+        case .offset:
+            IqamahSchedule(source: .offsets(settings.iqamahOffsets))
+        case .website:
+            iqamah.times.map { IqamahSchedule(source: .posted($0)) }
+        }
+    }
+
+    /// A safety net, called once a second by the ticker and doing nothing almost every time.
+    ///
+    /// Day rollover, wake and clock changes all rebuild the batch already. This covers the case
+    /// none of them do: a Mac left running with nothing changing, where a batch that somehow
+    /// went missing would otherwise stay missing.
+    private func topUpNotificationsIfStale(at date: Date) {
+        guard let last = lastRescheduledAt else { return }
+        guard date.timeIntervalSince(last) > Self.scheduleTopUpInterval else { return }
+        rescheduleNotifications()
     }
 }
 

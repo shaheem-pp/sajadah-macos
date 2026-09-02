@@ -26,7 +26,11 @@ struct SajadahApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        WindowGroup(id: SajadahWindow.main) {
+        // `Window`, not `WindowGroup`: there is only ever one of this. A group opens a fresh
+        // window every time `openWindow(id:)` is called, so clicking the popover's Quran
+        // button twice — or tapping two widgets — left you with a stack of identical windows.
+        // A single-instance scene brings the existing one forward instead.
+        Window("Sajadah", id: SajadahWindow.main) {
             MainWindowView()
                 .onOpenURL { url in
                     // Widget taps arrive as sajadah:// URLs; anything unrecognised just

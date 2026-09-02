@@ -8,6 +8,18 @@ import CoreLocation
 import Foundation
 import Observation
 
+/// One prayer with everything scheduling a notification about it needs: which day it belongs
+/// to (so an answered prayer can be skipped), when the Adhan is, and when the masjid's Iqamah
+/// follows — `nil` when no masjid is configured, or its posted time can't be read.
+nonisolated struct UpcomingPrayer: Identifiable, Sendable, Equatable {
+    let prayer: Prayer
+    let dayKey: String
+    let adhan: Date
+    let iqamah: Date?
+
+    var id: String { "\(dayKey)-\(prayer.rawValue)" }
+}
+
 /// Owns prayer timings: fetching them, caching them to disk, and answering "what's next?".
 ///
 /// Timings are cached a whole month at a time and always kept covering at least the next
@@ -38,6 +50,14 @@ final class PrayerTimesStore {
     /// status item redraws about once a minute instead of once a second.
     private(set) var menuBar: MenuBarContent = .placeholder
 
+    /// The instant `menuBar` is counting down to — the next Adhan, or an Iqamah still ahead of
+    /// it. Read by `Ticker` to work out when the displayed minute will actually change, so it
+    /// can sleep until exactly then instead of sampling on a fixed cadence.
+    ///
+    /// Not observed: it moves with the countdown and would invalidate every view watching the
+    /// store, once a tick, for a value no view reads.
+    @ObservationIgnored private(set) var menuBarTarget: Date?
+
     private(set) var days: [String: DayTimings] = [:]
 
     /// Fires whenever the set of known future prayers changes, so notifications can be rescheduled.
@@ -59,6 +79,10 @@ final class PrayerTimesStore {
     private static let significantMoveMetres: CLLocationDistance = 5_000
     /// Days of coverage to keep ahead of today.
     private static let coverageDays = 8
+    /// How far back `upcomingPrayers(limitDays:iqamah:)` still reports a prayer. Comfortably
+    /// longer than the largest check-in delay the settings allow, so a just-passed Adhan keeps
+    /// its follow-ups.
+    private static let scheduleLookback: TimeInterval = 6 * 3_600
 
     // MARK: Init
 
@@ -108,10 +132,31 @@ final class PrayerTimesStore {
         nextEvent.map { $0.date.timeIntervalSince(now) }
     }
 
-    /// Every upcoming prayer, for the notification scheduler and the window's week view.
-    func upcomingEvents(limitDays: Int) -> [PrayerEvent] {
+    /// Every prayer the notification scheduler might still have something to say about, with
+    /// the day it belongs to and the masjid's Iqamah for it.
+    ///
+    /// The window reaches slightly *backwards* as well as forwards: a prayer whose Adhan was a
+    /// few minutes ago still has a "did you pray?" ask ahead of it. Deciding which of a
+    /// prayer's derived moments have already passed is the scheduler's job, so this hands over
+    /// everything that could still matter and lets it drop what's spent.
+    func upcomingPrayers(limitDays: Int, iqamah: IqamahSchedule?) -> [UpcomingPrayer] {
         let horizon = now.addingTimeInterval(Double(limitDays) * 86_400)
-        return sortedEvents.filter { $0.date > now && $0.date <= horizon }
+        let earliest = now.addingTimeInterval(-Self.scheduleLookback)
+
+        return days.values
+            .flatMap { day in
+                DayLog.tracked.compactMap { prayer -> UpcomingPrayer? in
+                    let adhan = day.time(for: prayer)
+                    guard adhan > earliest, adhan <= horizon else { return nil }
+                    return UpcomingPrayer(
+                        prayer: prayer,
+                        dayKey: day.dayKey,
+                        adhan: adhan,
+                        iqamah: iqamah?.date(for: prayer, on: day)
+                    )
+                }
+            }
+            .sorted { $0.adhan < $1.adhan }
     }
 
     var todayKey: String {
@@ -213,6 +258,7 @@ final class PrayerTimesStore {
     /// for at any given moment.
     private func makeMenuBarContent(at date: Date, iqamah: IqamahTimes?) -> MenuBarContent {
         if let waiting = waitingForIqamah(at: date, iqamah: iqamah) {
+            menuBarTarget = waiting.iqamahDate
             return MenuBarContent(
                 icon: waiting.event.prayer.systemImage,
                 prayer: waiting.event.prayer.displayName,
@@ -228,6 +274,7 @@ final class PrayerTimesStore {
         }
 
         let next = nextEvent
+        menuBarTarget = next?.date
         let clockTime = next.map {
             TimeFormatting.clock($0.date, use24Hour: settings?.use24HourClock ?? false, timeZone: displayTimeZone)
         } ?? ""
@@ -442,7 +489,6 @@ final class PrayerTimesStore {
     private func persist(method: Int, school: Int) {
         cachedMethod = method
         cachedSchool = school
-        guard let cacheURL else { return }
 
         let cache = PrayerCacheFile(
             days: days,
@@ -456,7 +502,7 @@ final class PrayerTimesStore {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         guard let data = try? encoder.encode(cache) else { return }
-        try? data.write(to: cacheURL, options: .atomic)
+        AppFiles.write(data, to: CacheFileName.prayerTimes)
     }
 
     private var todayKeyInCurrentZone: String {

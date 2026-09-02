@@ -50,6 +50,10 @@ final class IqamahStore {
     /// The local calendar day this last ticked into an afternoon refresh, so it fires once per
     /// day rather than on every tick once past the boundary.
     @ObservationIgnored private var lastAfternoonRefreshDayKey: String?
+    /// The local calendar day last synced at its own rollover. Seeded on the first tick rather
+    /// than in `init`, so launching doesn't count as a rollover and double up with the
+    /// refresh `AppCoordinator` already does at startup.
+    @ObservationIgnored private var lastMidnightSyncDayKey: String?
 
     /// Local hour an Iqamah re-check counts as "this afternoon" — masjids sometimes correct a
     /// same-day posting, and checking once past midday catches that before Asr/Maghrib/Isha.
@@ -68,14 +72,38 @@ final class IqamahStore {
 
     // MARK: Ticking
 
-    /// Called every second by the app-wide `Ticker`, same as `PrayerTimesStore.tick(_:)`.
-    /// Refreshes once, the first tick each day that reaches the afternoon — not on any fixed
-    /// timer, so it costs nothing while the app isn't running and needs no separate scheduling.
+    /// Called by the app-wide `Ticker`, same as `PrayerTimesStore.tick(_:)`.
+    ///
+    /// Two refreshes a day, both driven off the calendar rather than a timer, so they cost
+    /// nothing while the app isn't running and need no separate scheduling:
+    ///
+    ///  - **At midnight**, because a posted schedule belongs to a day and today's is now
+    ///    yesterday's. A Mac asleep at midnight syncs on the first tick after it wakes.
+    ///  - **In the afternoon**, because masjids sometimes correct a same-day posting, and
+    ///    catching that before Asr is the difference between right and wrong for three prayers.
     func tick(_ date: Date) {
         let calendar = Calendar.current
-        guard calendar.component(.hour, from: date) >= Self.afternoonHour else { return }
-
         let todayKey = DayKey.make(for: date, in: calendar.timeZone)
+
+        if lastMidnightSyncDayKey == nil {
+            // First tick of this launch. Seed both markers so neither fires immediately —
+            // the app has just refreshed on its own.
+            lastMidnightSyncDayKey = todayKey
+            if calendar.component(.hour, from: date) >= Self.afternoonHour {
+                lastAfternoonRefreshDayKey = todayKey
+            }
+            return
+        }
+
+        if todayKey != lastMidnightSyncDayKey {
+            lastMidnightSyncDayKey = todayKey
+            // A new day's afternoon check is owed again.
+            lastAfternoonRefreshDayKey = nil
+            refresh()
+            return
+        }
+
+        guard calendar.component(.hour, from: date) >= Self.afternoonHour else { return }
         guard todayKey != lastAfternoonRefreshDayKey else { return }
         lastAfternoonRefreshDayKey = todayKey
         refresh()
@@ -205,17 +233,15 @@ final class IqamahStore {
     }
 
     private func persist(times: IqamahTimes, sourceURLString: String?) {
-        guard let cacheURL else { return }
         let cache = IqamahCacheFile(times: times, sourceURLString: sourceURLString, fetchedAt: .now)
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         guard let data = try? encoder.encode(cache) else { return }
-        try? data.write(to: cacheURL, options: .atomic)
+        AppFiles.write(data, to: CacheFileName.iqamah)
         onTimesChanged?()
     }
 
     private func clearCache() {
-        guard let cacheURL else { return }
-        try? FileManager.default.removeItem(at: cacheURL)
+        AppFiles.remove(CacheFileName.iqamah)
     }
 }

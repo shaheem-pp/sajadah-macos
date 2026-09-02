@@ -6,5 +6,22 @@
 	<array>
 		<string>$(TeamIdentifierPrefix)dev.shaheem.Sajadah</string>
 	</array>
+	<!--
+	  Lets the app write the widget cache into the widget extension's own container.
+
+	  On an ad-hoc-signed build — which is every release, since notarizing needs a paid
+	  membership — macOS will not grant a sandboxed extension access to an App Group container.
+	  The extension can't drop its sandbox either; PlugInKit refuses to load unsandboxed
+	  plug-ins. Its own container is the one place it can always read, so that is where the app
+	  puts a copy. See AppFiles.
+
+	  Scoped to the container root rather than to the Application Support directory inside it:
+	  the app has to see whether the container exists before writing, and a grant beginning
+	  below Data doesn't even allow stat-ing Data.
+	-->
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+	<array>
+		<string>/Library/Containers/dev.shaheem.Sajadah.SajadahWidgets/</string>
+	</array>
 </dict>
 </plist>

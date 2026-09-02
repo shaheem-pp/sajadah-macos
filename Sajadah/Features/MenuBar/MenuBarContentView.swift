@@ -237,9 +237,24 @@ struct MenuBarContentView: View {
         showWindow()
     }
 
+    /// Brings the main window up, wherever it currently is.
+    ///
+    /// The scene is a `Window`, so there is only ever one and `openWindow` reuses it rather
+    /// than stacking up copies. That still leaves the two states `openWindow` alone doesn't
+    /// recover from: a window minimised into the Dock stays minimised, and one buried behind
+    /// another app stays buried. Both look exactly like the click having done nothing.
     private func showWindow() {
         NSApp.activate(ignoringOtherApps: true)
         openWindow(id: SajadahWindow.main)
+
+        // After the open, so a window created just now is included.
+        Task { @MainActor in
+            guard let window = NSApp.windows.first(where: {
+                !($0 is NSPanel) && $0.canBecomeMain
+            }) else { return }
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            window.makeKeyAndOrderFront(nil)
+        }
     }
 
     static func openLocationSystemSettings() {

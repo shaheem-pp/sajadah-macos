@@ -15,5 +15,7 @@
 	</array>
 	<key>SajadahAppGroup</key>
 	<string>$(TeamIdentifierPrefix)dev.shaheem.Sajadah</string>
+	<key>SajadahWidgetBundleID</key>
+	<string>dev.shaheem.Sajadah.SajadahWidgets</string>
 </dict>
 </plist>

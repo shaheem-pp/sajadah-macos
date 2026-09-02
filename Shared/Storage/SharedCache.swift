@@ -113,8 +113,10 @@ nonisolated struct SajadahSnapshot: Sendable {
     }
 
     private static func decode<T: Decodable>(_ name: String, isoDates: Bool = false) -> T? {
-        guard let url = AppFiles.existingURL(for: name),
-              let data = try? Data(contentsOf: url) else { return nil }
+        // `AppFiles.readData` walks every location this process might be able to read from —
+        // the App Group container on a signed build, the mirror in this extension's own
+        // container otherwise. See AppFiles for why the second one has to exist.
+        guard let data = AppFiles.readData(for: name) else { return nil }
         let decoder = JSONDecoder()
         if isoDates { decoder.dateDecodingStrategy = .iso8601 }
         return try? decoder.decode(T.self, from: data)

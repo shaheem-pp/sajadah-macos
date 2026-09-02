@@ -45,6 +45,38 @@ magic incantation: the quarantine flag that triggers macOS's block is attached b
 when it saves the file, not by macOS on everything you download. `curl` does not set it, so there
 is nothing to clear.
 
+### Already have an older version?
+
+Same idea, with two extra steps. Copy the whole block:
+
+```bash
+killall Sajadah 2>/dev/null;
+curl -fsSL https://github.com/shaheem-pp/sajadah-macos/releases/latest/download/Sajadah.dmg -o /tmp/Sajadah.dmg &&
+hdiutil attach -quiet /tmp/Sajadah.dmg &&
+rm -rf /Applications/Sajadah.app &&
+cp -R /Volumes/Sajadah/Sajadah.app /Applications/ &&
+hdiutil detach -quiet /Volumes/Sajadah &&
+rm /tmp/Sajadah.dmg &&
+open /Applications/Sajadah.app
+```
+
+The two additions matter:
+
+- **Quitting first.** The old copy is running from the bundle being replaced, and its widget
+  extension is loaded by macOS.
+- **`rm -rf` before the copy.** `cp -R` onto an existing app *merges* directories rather than
+  replacing them, so files that existed in the old version but not the new one survive — and a
+  bundle containing files its signature doesn't account for fails validation and refuses to
+  open. The delete deliberately comes after the download and mount have both succeeded, so a
+  dropped connection can't leave you with no app at all.
+
+Your prayer log, streak, bookmarks and settings are untouched: they live in a container outside
+the app bundle, not inside it.
+
+If you are coming from **1.2 or earlier, widgets were blank** — that's fixed. They fill in once
+the updated app has run. If one still looks empty a minute later, remove it from Notification
+Centre and add it again.
+
 ### Or download the DMG
 
 **[⬇ Latest release](https://github.com/shaheem-pp/sajadah-macos/releases/latest)**
@@ -79,16 +111,14 @@ can read, and every release publishes a SHA-256 you can check against your downl
 Going through **System Settings → Privacy & Security → Open Anyway** also works. The old
 right-click → *Open* trick does not, on macOS 15 and later.
 
-### Two known limitations of unsigned builds
-
-Both work correctly when you build from source with your own Apple ID:
+### One known limitation of unsigned builds
 
 - **Launch at Login** may fail. macOS's `SMAppService` requires a full developer signature. The
-  toggle in Settings reports the error rather than silently lying about its state.
-- **Widgets may not load.** They read from an App Group container that macOS grants based on the
-  signature. If your widgets stay blank, this is why.
+  toggle in Settings reports the error rather than silently lying about its state. It works
+  correctly when you build from source with your own Apple ID — about two minutes.
 
-If either matters to you, build from source — it takes about two minutes.
+Widgets used to be listed here too. They now work on unsigned builds; see
+[Widgets](#widgets).
 
 ## Requirements
 
@@ -97,19 +127,21 @@ If either matters to you, build from source — it takes about two minutes.
 
 ## Features
 
-- Menubar countdown to the next prayer, updated every second (redrawn only when the text changes)
+- Menubar countdown to the next prayer, redrawn only when the text actually changes — and only woken once a minute unless a seconds countdown is on screen
 - Popover with today's six timings, the current place, and the Hijri date
 - Full window with today plus the next 7 days
 - Local notifications at prayer time, with per-prayer toggles and an optional "N minutes before" offset
-- Two-stage check-ins that ask whether you prayed, with Yes/No buttons right on the notification
+- Iqamah reminders a configurable number of minutes before your masjid's congregation time
+- Two-stage check-ins that ask whether you prayed — shortly after the Adhan, and once more as the window closes — with Yes/No buttons right on the notification
 - Prayer log with daily streaks, a best-streak record, and a 30-day history grid
 - Quran reader with all 114 surahs, Arabic interleaved with your choice of 17 English translations
 - Full-text translation search, bookmarks, resume-where-you-left-off, and a verse of the day
-- Friday reminder to read Surah Al-Kahf
+- Friday reminder to read Surah Al-Kahf, plus an optional daily reading reminder
 - 17 calculation methods and both Asr conventions, changeable in Settings
 - Works offline: timings are cached a month at a time on disk and keep displaying with an "Offline" badge if a refresh fails
 - Refreshes on wake, on day rollover, on clock changes, and when you move more than 5 km
 - Optional launch at login
+- Lives in the menubar: no Dock icon unless a window is open, and one window rather than a new one per click
 - Masjid Iqamah times — scraped from your masjid's own page, or computed as minutes after Adhan for masjids with no site of their own — shown in the menubar, popover, main window and a widget
 
 ## Widgets
@@ -125,6 +157,14 @@ Sajadah ships a WidgetKit extension. Add widgets from Notification Centre → Ed
 
 Widgets read the same on-disk cache the app writes, so they keep working offline and cost no
 extra network requests. Tapping one deep-links into the app via a `sajadah://` URL.
+
+That cache normally lives in an App Group container. On a downloaded release it can't: releases
+are ad-hoc signed, macOS grants App Group containers by matching them against the signature's
+team identifier, and an ad-hoc signature has none — so the kernel denies the widget every read.
+Dropping the extension's sandbox isn't an option either, because PlugInKit refuses to load an
+unsandboxed plug-in at all. The one place a sandboxed extension can always read is its own
+container, so the app mirrors the four files widgets need into it. Signed builds keep using the
+App Group and never touch the mirror. See `Shared/Storage/AppFiles.swift`.
 
 ## Building from source
 
@@ -198,8 +238,8 @@ whether or not any view is on screen:
 - **`LocationManager`** publishes a `State` enum (`loading` / `home` / `needPermission` / `denied` / `error`) and hands fresh coordinates to the store through a callback.
 - **`AladhanAPI`** fetches one calendar month per request from `/v1/calendar/{year}/{month}` with `iso8601=true`, so every timing arrives as a fully-offset instant and DST needs no special handling.
 - **`PrayerTimesStore`** caches months to the App Group container, always keeps at least 8 days of timings ahead of today, and answers "what's next?" by searching a flat sorted list of events — which is what makes the countdown cross midnight correctly.
-- **`Ticker`** advances the clock once a second via an async loop rather than a run-loop timer, so it keeps ticking while the popover is open.
-- **`NotificationScheduler`** rewrites the whole pending batch whenever timings, preferences or the prayer log change. Rather than rationing each kind of notification separately, it builds every candidate, sorts by fire date and keeps the nearest 60 — so the 64-request budget always goes to whatever happens soonest.
+- **`Ticker`** advances the clock via an async loop rather than a run-loop timer, so it keeps ticking while the popover is open. The interval follows the audience: once a second while something with a seconds countdown is on screen, otherwise once a minute — the menubar reads "5h 9m" and cannot change faster than that, so waking sixty times to recompute it was fifty-nine times too many. That minute is measured to the *prayer*, not the wall clock: a prayer at 13:00:30 flips the display at :30 past each minute, so sleeping to :00 would leave the menubar up to a minute stale. Anything appearing on screen restarts the loop, so opening the popover never shows a frozen countdown.
+- **`NotificationScheduler`** rebuilds the pending batch whenever timings, preferences or the prayer log change. Every candidate is built, sorted by fire date, and the nearest 60 kept, so the 64-request budget always goes to whatever happens soonest. Two details are load-bearing: rebuilds are serialised, because two overlapping ones used to delete each other's requests; and the batch is diffed rather than wiped, because `add` already replaces a request with the same identifier and removing one you are about to re-add is a race with nothing to gain. Authorization is re-read on every rebuild, so granting permission in System Settings takes effect without a relaunch.
 - **`PrayerLogStore`** records what was prayed in its own file, deliberately separate from the timings cache: it is the user's own data and must survive a location change, a method change or a cache wipe.
 
 ### Iqamah
@@ -222,6 +262,12 @@ configurable in Settings → Masjid:
 - **Minutes after Adhan.** For masjids with no posted schedule, or a site the scraper can't read,
   a fixed per-prayer offset — Maghrib defaults shorter than the rest, matching how most masjids
   actually run it — computed straight from the Adhan times already on hand. No network involved.
+
+A scraped page is re-read twice a day, both driven off the calendar rather than a timer, so
+they cost nothing while the app isn't running: at midnight, because a posted schedule belongs to
+a day and today's has just become yesterday's; and once in the afternoon, because masjids
+sometimes correct a same-day posting and catching that before Asr is the difference between
+right and wrong for three prayers. A Mac asleep at midnight syncs on the first tick after waking.
 
 Either source produces the same `IqamahTimes` value, so the menubar badge, popover row, widget
 and window card don't know or care which one produced it. The menubar shows one clock, never

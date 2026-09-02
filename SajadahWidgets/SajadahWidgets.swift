@@ -388,6 +388,11 @@ struct AyahWidgetView: View {
                         .font(.caption2).foregroundStyle(.tertiary)
                 }
 
+                // A short verse used to leave the whole lower half of the large widget empty,
+                // with the text clinging to the header. Equal spacers above and below centre
+                // the verse in whatever room is left, while the label stays pinned at the top.
+                Spacer(minLength: 0)
+
                 Text(ayah.arabic)
                     .font(.arabic(ArabicFontChoice.defaultID, size: family == .systemLarge ? 22 : 17))
                     .lineSpacing(family == .systemLarge ? 10 : 7)

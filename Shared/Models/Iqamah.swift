@@ -64,3 +64,37 @@ nonisolated struct IqamahTimes: Codable, Sendable, Equatable {
         ))
     }
 }
+
+// MARK: - Scheduling
+
+/// How Iqamah times are derived for *any* day, not just today.
+///
+/// `IqamahTimes` alone isn't enough to schedule against: it holds display strings for one day,
+/// and in offset mode `IqamahStore` computes those from today's Adhan times only. The
+/// notification scheduler needs tomorrow and the day after too, so it takes this instead — the
+/// rule rather than the result.
+nonisolated struct IqamahSchedule: Sendable, Equatable {
+
+    enum Source: Sendable, Equatable {
+        /// Times posted on the masjid's own page. The same clock times every day, until the
+        /// next scrape says otherwise.
+        case posted(IqamahTimes)
+        /// Minutes after that day's own Adhan, per prayer.
+        case offsets([Prayer: Int])
+    }
+
+    var source: Source
+
+    /// When Iqamah falls on `day`, or nil when it can't be known — a posted value that isn't a
+    /// plain clock time (Maghrib is often "Sunset"), or a prayer with no rule of its own.
+    func date(for prayer: Prayer, on day: DayTimings) -> Date? {
+        let adhan = day.time(for: prayer)
+        switch source {
+        case .posted(let times):
+            return times.date(for: prayer, onSameDayAs: adhan, timeZone: day.timeZone)
+        case .offsets(let minutes):
+            guard prayer.isPrayer, let offset = minutes[prayer] else { return nil }
+            return adhan.addingTimeInterval(TimeInterval(offset * 60))
+        }
+    }
+}

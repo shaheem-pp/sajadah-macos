@@ -239,11 +239,10 @@ final class QuranStore {
     }
 
     private func writeDailyToDisk(_ ayah: DailyAyah, dayKey: String, edition: String) {
-        guard let url = AppFiles.url(for: CacheFileName.dailyAyah),
-              let data = try? JSONEncoder().encode(
-                  DailyAyahCache(dayKey: dayKey, edition: edition, ayah: ayah)
-              ) else { return }
-        try? data.write(to: url, options: .atomic)
+        guard let data = try? JSONEncoder().encode(
+            DailyAyahCache(dayKey: dayKey, edition: edition, ayah: ayah)
+        ) else { return }
+        AppFiles.write(data, to: CacheFileName.dailyAyah)
     }
 
     private static func message(for error: Error) -> String {

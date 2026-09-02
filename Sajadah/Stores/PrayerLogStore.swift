@@ -90,7 +90,7 @@ final class PrayerLogStore {
     }
 
     private func save() {
-        guard let fileURL, let data = try? JSONEncoder().encode(days) else { return }
-        try? data.write(to: fileURL, options: .atomic)
+        guard let data = try? JSONEncoder().encode(days) else { return }
+        AppFiles.write(data, to: CacheFileName.prayerLog)
     }
 }
