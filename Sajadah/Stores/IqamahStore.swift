@@ -194,6 +194,14 @@ final class IqamahStore {
     }
 
     private static func message(for result: IqamahScrapeResult) -> String {
+        // Checked before the missing-label cases: a page can be perfectly readable and still be
+        // showing last month's schedule, which is the more useful thing to say about it.
+        if result.isOutOfDate, let posted = result.postedDate {
+            let day = posted.formatted(.dateTime.day().month(.wide))
+            return "This page is showing its schedule for \(day), not today. "
+                + "Its times would be wrong, so Sajadah won’t use them — try “Minutes after Athaan” instead."
+        }
+
         let missing = result.missingCoreLabels
         let coreCount = IqamahLabel.allCases.filter(\.isCore).count
         if missing.count == coreCount {
