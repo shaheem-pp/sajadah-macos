@@ -19,11 +19,28 @@ week ahead, your prayer streak, and a Quran reader.
 Timings come from the [Aladhan API](https://aladhan.com/prayer-times-api), the Quran from
 [alquran.cloud](https://alquran.cloud/api), and your position from CoreLocation.
 
-<!-- SCREENSHOTS: replace these with real captures.
-     Suggested: menubar popover, main window with the week, Quran reader, widget gallery. -->
 <div align="center">
-<em>Screenshots coming soon.</em>
+
+<img src="docs/screenshots/home.png" width="900" alt="The main window: today's timings with Adhan beside the masjid's Jamaah time, a streak grid, and the next seven days">
+
+<em>Today's six timings — Adhan beside your masjid's Jamaah time — your streak, and the week ahead.</em>
+
 </div>
+
+<table>
+<tr>
+<td width="34%" valign="top" align="center">
+<img src="docs/screenshots/menubar.png" width="280" alt="The menubar popover: next prayer countdown, today's timings, streak and the ayah of the day">
+</td>
+<td width="66%" valign="top" align="center">
+<img src="docs/screenshots/quran.png" width="640" alt="The Quran reader showing Surah Ar-Rahman: Uthmani Arabic in Amiri Quran with an English translation under each ayah">
+</td>
+</tr>
+<tr>
+<td align="center"><em>The popover — countdown, Iqamah, today's timings, and the ayah of the day.</em></td>
+<td align="center"><em>The reader — Uthmani Arabic set in Amiri Quran, translation under each ayah.</em></td>
+</tr>
+</table>
 
 ## Download
 
