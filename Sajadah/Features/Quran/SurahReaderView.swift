@@ -58,7 +58,12 @@ struct SurahReaderView: View {
                             isHighlighted: scrollTarget == ayah.numberInSurah,
                             onToggleBookmark: { reading.toggleBookmark(ref) }
                         )
-                        .id(ayah.numberInSurah)
+                        // Identified by surah *and* ayah. `numberInSurah` alone is 1, 2,
+                        // 3… in all 114 surahs, so switching surah handed the LazyVStack a
+                        // fresh row under an identity it had already realised — and it kept
+                        // the old one on screen, leaving Ar-Rahman's heading over Ibrahim's
+                        // verses.
+                        .id(ref)
                         .onAppear {
                             // Whatever is on screen is where you are; coalesced before it
                             // reaches disk.
@@ -80,12 +85,16 @@ struct SurahReaderView: View {
             .onAppear { jump(proxy) }
             .onChange(of: scrollTarget) { jump(proxy) }
         }
+        // A new surah is a new scroll container, so the reader opens at the top instead of
+        // holding the offset the last one was left at.
+        .id(surahNumber)
     }
 
     private func jump(_ proxy: ScrollViewProxy) {
         guard let scrollTarget else { return }
+        let ref = AyahRef(surah: surahNumber, ayah: scrollTarget)
         DispatchQueue.main.async {
-            withAnimation { proxy.scrollTo(scrollTarget, anchor: .center) }
+            withAnimation { proxy.scrollTo(ref, anchor: .center) }
         }
     }
 
