@@ -90,6 +90,12 @@ The two additions matter:
 Your prayer log, streak, bookmarks and settings are untouched: they live in a container outside
 the app bundle, not inside it.
 
+From 1.4 onwards you shouldn't have to come looking for this: Sajadah checks GitHub once a day,
+says so in the popover when a release exists, and Settings → General has a **Copy Update
+Command** button that puts these same steps on your clipboard as a single line. It stops there
+rather than updating itself, because an ad-hoc signed bundle can't be safely replaced while it
+is the one doing the replacing — which is the whole reason the block above quits first.
+
 If you are coming from **1.2 or earlier, widgets were blank** — that's fixed. They fill in once
 the updated app has run. If one still looks empty a minute later, remove it from Notification
 Centre and add it again.
@@ -158,6 +164,7 @@ Widgets used to be listed here too. They now work on unsigned builds; see
 - Works offline: timings are cached a month at a time on disk and keep displaying with an "Offline" badge if a refresh fails
 - Refreshes on wake, on day rollover, on clock changes, and when you move more than 5 km
 - Optional launch at login
+- Notices when a new release exists and hands you the command to install it — checked once a day, switchable off in Settings
 - Lives in the menubar: no Dock icon unless a window is open, and one window rather than a new one per click
 - Masjid Iqamah times — scraped from your masjid's own page, or computed as minutes after Adhan for masjids with no site of their own — shown in the menubar, popover, main window and a widget
 
@@ -240,8 +247,8 @@ Shared/            Compiled into BOTH the app and the widget extension
   Fonts/           Amiri Quran + the code that registers it
 Sajadah/
   App/             Entry point, AppCoordinator, navigation
-  Services/        Network clients, CoreLocation, notifications, the ticker, IqamahScraper, IqamahOffsetCalculator
-  Stores/          Observable state: timings, prayer log, Quran, settings, Iqamah
+  Services/        Network clients, CoreLocation, notifications, the ticker, IqamahScraper, IqamahOffsetCalculator, UpdateChecker
+  Stores/          Observable state: timings, prayer log, Quran, settings, Iqamah, updates
   Features/        One folder per surface — MenuBar, Prayer, Quran, Settings
   UI/              Shared views and formatting used across features
 SajadahWidgets/    WidgetKit extension
@@ -373,6 +380,10 @@ can't drift from the UI:
 No account, no analytics, no telemetry. Your coordinates go to `api.aladhan.com` to compute
 timings — that is the only personal data that leaves your Mac, and it goes to no one else.
 Everything you generate (prayer log, streaks, bookmarks, reading position) stays local.
+
+Three other requests carry nothing of yours: surah text from `api.alquran.cloud`, your masjid's
+own page for its Iqamah schedule, and a daily `GET` to `api.github.com` asking whether a newer
+release exists. That last one can be turned off in Settings → General.
 
 Full detail in [PRIVACY.md](PRIVACY.md).
 

@@ -37,6 +37,8 @@ nonisolated enum CacheFileName {
     static let prayerLog = "prayer-log.json"
     static let dailyAyah = "quran/daily.json"
     static let iqamah = "iqamah-cache.json"
+    /// Not mirrored to the widget container: widgets have no use for it.
+    static let updateCheck = "update-check.json"
 }
 
 // MARK: - Snapshot

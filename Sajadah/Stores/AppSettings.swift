@@ -264,6 +264,21 @@ final class AppSettings {
         }
     }
 
+    // MARK: Updates
+
+    /// Whether to ask GitHub once a day whether a newer release exists.
+    ///
+    /// On by default. Sajadah is distributed outside the App Store and has no way to update
+    /// itself, so a copy that never checks is a copy that stays on whatever version it was
+    /// installed at indefinitely — bugs and all. The check sends no identifying information
+    /// and needs no account; turning it off stops it entirely.
+    var updateChecksEnabled: Bool {
+        didSet {
+            guard updateChecksEnabled != oldValue else { return }
+            defaults.set(updateChecksEnabled, forKey: Key.updateChecksEnabled)
+        }
+    }
+
     /// Reflects the real `SMAppService` state; setting it registers or unregisters the app.
     var launchAtLogin: Bool {
         didSet {
@@ -315,6 +330,7 @@ final class AppSettings {
         quranReminderEnabled = defaults.object(forKey: Key.quranReminderEnabled) as? Bool ?? false
         quranReminderMinutes = defaults.object(forKey: Key.quranReminderMinutes) as? Int ?? (20 * 60)
         use24HourClock = defaults.object(forKey: Key.use24HourClock) as? Bool ?? false
+        updateChecksEnabled = defaults.object(forKey: Key.updateChecksEnabled) as? Bool ?? true
         launchAtLogin = SMAppService.mainApp.status == .enabled
         iqamahSourceMode = (defaults.string(forKey: Key.iqamahSourceMode)).flatMap(IqamahSourceMode.init(rawValue:))
             ?? .website
@@ -389,6 +405,7 @@ final class AppSettings {
         static let quranReminderEnabled = "quranReminderEnabled"
         static let quranReminderMinutes = "quranReminderMinutes"
         static let use24HourClock = "use24HourClock"
+        static let updateChecksEnabled = "updateChecksEnabled"
         static let iqamahSourceMode = "iqamahSourceMode"
         static let masjidURL = "masjidURL"
         static let iqamahOffsetFajr = "iqamahOffsetFajr"

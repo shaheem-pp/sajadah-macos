@@ -18,6 +18,7 @@ struct MenuBarContentView: View {
     @Environment(QuranStore.self) private var quran
     @Environment(IqamahStore.self) private var iqamah
     @Environment(AppNavigation.self) private var navigation
+    @Environment(UpdateStore.self) private var update
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -40,11 +41,58 @@ struct MenuBarContentView: View {
                 unavailableContent
             }
 
+            updateRow
+
             Divider().overlay(Theme.hairline)
             actions
         }
         .padding(12)
         .frame(width: 300)
+    }
+
+    // MARK: Update
+
+    /// Sits below the day's content and above the footer, so a release never displaces the
+    /// answer the popover exists to give. Brass rather than jade: it is worth noticing once,
+    /// not part of the furniture. Dismissing silences this release only — a later one asks
+    /// again.
+    @ViewBuilder
+    private var updateRow: some View {
+        if let release = update.available {
+            HStack(spacing: 7) {
+                Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.brass)
+
+                Text("Version \(release.version?.description ?? release.tag) is available")
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+
+                Spacer(minLength: 6)
+
+                Button("Get") { update.openReleasePage() }
+                    .buttonStyle(.link)
+                    .font(.system(size: 12, weight: .medium))
+                    .help("Open the release page on GitHub")
+
+                Button {
+                    update.dismissAvailable()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tertiary)
+                .help("Don’t mention this version again")
+            }
+            .font(.system(size: 12))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                Theme.brass.opacity(0.10),
+                in: RoundedRectangle(cornerRadius: Theme.rowRadius, style: .continuous)
+            )
+        }
     }
 
     // MARK: Hero

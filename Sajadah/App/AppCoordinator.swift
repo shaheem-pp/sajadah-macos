@@ -25,6 +25,7 @@ final class AppCoordinator {
     let reading = ReadingProgressStore()
     let navigation = AppNavigation()
     let scheduler = NotificationScheduler()
+    let update = UpdateStore()
 
     @ObservationIgnored private var ticker: Ticker?
 
@@ -44,6 +45,7 @@ final class AppCoordinator {
         store.configure(settings: settings)
         iqamah.configure(settings: settings, prayerTimes: store)
         quran.configure(settings: settings)
+        update.configure(settings: settings)
 
         location.onCoordinate = { [store] coordinate in
             store.updateCoordinate(coordinate)
@@ -91,6 +93,10 @@ final class AppCoordinator {
             quran.refreshDailyAyah(dayKey: store.todayKey)
             iqamah.tick(date)
             self?.topUpNotificationsIfStale(at: date)
+            // Guarded on a day having passed, so this is two comparisons almost every tick.
+            // Launch-only checking would mean a Mac left running for a month never notices a
+            // release at all.
+            self?.update.checkIfDue()
         }
         ticker?.start()
 
@@ -135,6 +141,7 @@ final class AppCoordinator {
 
         quran.loadSurahList()
         quran.refreshDailyAyah(dayKey: store.todayKey)
+        update.checkIfDue()
 
         await scheduler.requestAuthorizationIfNeeded()
         rescheduleNotifications()
@@ -240,5 +247,6 @@ extension View {
             .environment(app.reading)
             .environment(app.navigation)
             .environment(app.scheduler)
+            .environment(app.update)
     }
 }
