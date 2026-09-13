@@ -17,9 +17,6 @@ struct HomeView: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.openSettings) private var openSettings
 
-    /// The streak-grid day whose editor is open, if any.
-    @State private var editingDayKey: String?
-
     var body: some View {
         // Derived once and handed down: the panel and the table have to be describing the
         // same moment, and asking twice invites them to drift a tick apart.
@@ -163,13 +160,12 @@ struct HomeView: View {
     private var streak: some View {
         let current = log.currentStreak(asOf: store.todayKey)
         let best = log.bestStreak
-        let recent = log.recentDays(endingAt: store.todayKey, count: 30)
 
         return VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: "Streak", trailing: "Last 30 days")
+            SectionHeader(title: "Streak", trailing: "Last 5 weeks")
 
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 24) {
+            HStack(alignment: .center, spacing: 24) {
+                VStack(alignment: .leading, spacing: 12) {
                     StreakStat(
                         value: current,
                         label: current == 1 ? "day" : "days",
@@ -182,54 +178,14 @@ struct HomeView: View {
                         systemImage: "rosette",
                         isEarned: best > 0
                     )
-                    Spacer(minLength: 0)
                 }
 
-                HStack(spacing: 4) {
-                    ForEach(recent, id: \.dayKey) { entry in
-                        let title = dayTitle(entry.dayKey)
-                        Button {
-                            editingDayKey = entry.dayKey
-                        } label: {
-                            DayCell(
-                                prayed: entry.log?.prayed.count ?? 0,
-                                isToday: entry.dayKey == store.todayKey
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .help("\(title) — \(entry.log?.prayed.count ?? 0)/\(DayLog.tracked.count) prayed. Click to edit.")
-                        .popover(isPresented: editorBinding(for: entry.dayKey), arrowEdge: .bottom) {
-                            DayLogEditor(
-                                dayKey: entry.dayKey,
-                                title: title,
-                                loggable: loggablePrayers(on: entry.dayKey)
-                            )
-                        }
-                    }
-                }
+                Spacer(minLength: 24)
+
+                StreakCalendar()
             }
             .sajadahCard()
         }
-    }
-
-    private func editorBinding(for dayKey: String) -> Binding<Bool> {
-        Binding(
-            get: { editingDayKey == dayKey },
-            set: { if !$0 { editingDayKey = nil } }
-        )
-    }
-
-    private func dayTitle(_ dayKey: String) -> String {
-        DayKey.date(dayKey, in: store.displayTimeZone)
-            .map { TimeFormatting.weekday($0, timeZone: store.displayTimeZone) } ?? dayKey
-    }
-
-    /// The grid never shows a future day, so anything but today is fully loggable. Today keeps
-    /// the list's rule: a prayer can be logged only once its time has come.
-    private func loggablePrayers(on dayKey: String) -> Set<Prayer> {
-        guard dayKey == store.todayKey else { return Set(DayLog.tracked) }
-        guard let today = store.today else { return [] }
-        return Set(DayLog.tracked.filter { today.time(for: $0) < store.now })
     }
 
     /// Off by default, so it has to say it exists — once, and where the label it adds would
@@ -349,32 +305,5 @@ private struct StreakStat: View {
                     .foregroundStyle(.secondary)
             }
         }
-    }
-}
-
-/// One day in the 30-day trail. A day where every prayer was logged earns the star rather
-/// than a darker square — the shape changes, not just the value, so a complete day is
-/// findable at a glance.
-private struct DayCell: View {
-    let prayed: Int
-    let isToday: Bool
-
-    private var isComplete: Bool { prayed >= DayLog.tracked.count }
-
-    var body: some View {
-        ZStack {
-            if isComplete {
-                RubElHizb().fill(Theme.jade)
-            } else {
-                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                    .fill(Theme.jade.opacity(prayed == 0 ? 0.07 : 0.16 + 0.13 * Double(prayed)))
-            }
-
-            if isToday {
-                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                    .strokeBorder(Theme.jade.opacity(0.75), lineWidth: 1.2)
-            }
-        }
-        .frame(width: 14, height: 14)
     }
 }

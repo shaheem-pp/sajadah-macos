@@ -156,7 +156,7 @@ Widgets used to be listed here too. They now work on unsigned builds; see
 - Local notifications at prayer time, with per-prayer toggles and an optional "N minutes before" offset
 - Iqamah reminders a configurable number of minutes before your masjid's congregation time
 - Two-stage check-ins that ask whether you prayed — shortly after the Adhan, and once more as the window closes — with Yes/No buttons right on the notification
-- Prayer log with daily streaks, a best-streak record, and a 30-day history grid — click any square to log or correct a past day
+- Prayer log with daily streaks, a best-streak record, and a five-week calendar — click any day to log or correct it
 - Quran reader with all 114 surahs, Arabic interleaved with your choice of 17 English translations
 - Full-text translation search, bookmarks, resume-where-you-left-off, and a verse of the day
 - Friday reminder to read Surah Al-Kahf, plus an optional daily reading reminder
@@ -353,7 +353,7 @@ it missed. Answering at either stage retires the other, because the batch is reb
 scratch and skips anything already answered.
 
 Anything you miss can still be logged by clicking the circle beside a prayer in the popover,
-and any past day by clicking its square in the window's 30-day grid — which is the whole answer
+and any past day by clicking it in the window's five-week calendar — which is the whole answer
 for someone who prays every day and logs none of them: one click per skipped day, not five.
 
 ### Fasting
