@@ -20,6 +20,19 @@ nonisolated struct UpcomingPrayer: Identifiable, Sendable, Equatable {
     var id: String { "\(dayKey)-\(prayer.rawValue)" }
 }
 
+/// A voluntary fasting day with what a reminder about it needs: why it is one, when Fajr is,
+/// and the evening before it — which is where the reminder belongs, since a fast is decided
+/// on the night before. As with Iqamah, *when* to fire is the scheduler's call.
+nonisolated struct FastingDay: Identifiable, Sendable, Equatable {
+    let dayKey: String
+    let hijri: HijriDate
+    let reasons: [FastingReason]
+    let fajr: Date
+    let eve: DayTimings
+
+    var id: String { dayKey }
+}
+
 /// Owns prayer timings: fetching them, caching them to disk, and answering "what's next?".
 ///
 /// Timings are cached a whole month at a time and always kept covering at least the next
@@ -58,6 +71,8 @@ final class PrayerTimesStore {
     /// store, once a tick, for a value no view reads.
     @ObservationIgnored private(set) var menuBarTarget: Date?
 
+    /// The timings every reader uses, with the user's Adhan adjustments applied. Derived from
+    /// `rawDays` in `rebuildEvents()`; nothing writes to it directly.
     private(set) var days: [String: DayTimings] = [:]
 
     /// Fires whenever the set of known future prayers changes, so notifications can be rescheduled.
@@ -65,6 +80,9 @@ final class PrayerTimesStore {
 
     // MARK: Private state
 
+    /// The timings as the API computed them — what the cache holds. Adjustments are applied on
+    /// the way out rather than baked in, so changing them is arithmetic, not a refetch.
+    @ObservationIgnored private var rawDays: [String: DayTimings] = [:]
     @ObservationIgnored private var fetchedMonths: Set<String> = []
     @ObservationIgnored private var sortedEvents: [PrayerEvent] = []
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
@@ -98,17 +116,28 @@ final class PrayerTimesStore {
 
         // Timings computed with a different method are simply wrong now — drop them.
         if cachedMethod != settings.calculationMethod || cachedSchool != settings.asrSchool.rawValue {
-            days = [:]
+            rawDays = [:]
             fetchedMonths = []
-            rebuildEvents()
         }
+        // Unconditionally: `init` derived `days` before there were settings to adjust by.
+        rebuildEvents()
+    }
+
+    /// Re-derives every reader's timings from the cached ones. The cache is rewritten so the
+    /// widget sees the same adjustment, and `onEventsChanged` moves the notifications.
+    func adhanAdjustmentsChanged() {
+        rebuildEvents()
+        if !rawDays.isEmpty { persist(method: cachedMethod, school: cachedSchool) }
+        onEventsChanged?()
     }
 
     // MARK: Derived values
 
     var displayTimeZone: TimeZone {
-        days[todayKeyInCurrentZone]?.timeZone
-            ?? days.values.max { $0.dayKey < $1.dayKey }?.timeZone
+        // Off the raw cache: `loadCache` asks before the first `rebuildEvents` has derived
+        // `days`, and an adjustment never changes a day's zone anyway.
+        rawDays[todayKeyInCurrentZone]?.timeZone
+            ?? rawDays.values.max { $0.dayKey < $1.dayKey }?.timeZone
             ?? .current
     }
 
@@ -116,7 +145,83 @@ final class PrayerTimesStore {
         days[DayKey.make(for: now, in: displayTimeZone)]
     }
 
-    var hijriDateText: String? { today?.hijri }
+    /// The Hijri date of the civil day `dayKey`, with the user's adjustment applied.
+    func hijriDate(for dayKey: String) -> HijriDate? {
+        days.hijriDate(for: dayKey, adjustedBy: settings?.hijriAdjustmentDays ?? 0, timeZone: displayTimeZone)
+    }
+
+    /// What the date line reads right now — adjusted, and past Maghrib already tomorrow's.
+    var displayedHijriDate: HijriDate? {
+        days.displayedHijriDate(
+            at: now,
+            preferences: settings?.hijriPreferences ?? HijriPreferences(),
+            timeZone: displayTimeZone
+        )
+    }
+
+    /// Falls back to the API's own string for a cache written before the structured date
+    /// existed, so the line never goes blank while the one-time refetch is in flight.
+    var hijriDateText: String? { displayedHijriDate?.formatted ?? today?.hijri }
+
+    /// "Fasting day · Monday", "Iftar 7:32 PM", or nil. Lives beside the Hijri date it is
+    /// derived from, and is worded here rather than in the calendar because one case carries
+    /// a clock time, which only the app knows how the user wants written.
+    var fastingIndicator: String? {
+        guard let settings else { return nil }
+        let indicator = days.fastingIndicator(
+            at: now,
+            hijri: settings.hijriPreferences,
+            fasting: settings.fastingPreferences,
+            timeZone: displayTimeZone
+        )
+        return switch indicator {
+        case .fastingToday(let reasons): "Fasting day · \(reasons.joined)"
+        case .fastingTomorrow(let reasons): "Fasting tomorrow · \(reasons.joined)"
+        case .iftar(let maghrib):
+            "Iftar \(TimeFormatting.clock(maghrib, use24Hour: settings.use24HourClock, timeZone: displayTimeZone))"
+        case .ramadanTomorrow: "Ramadan tomorrow"
+        case nil: nil
+        }
+    }
+
+    /// The civil day `dayKey`'s fasting status, on the adjusted Hijri date. Nil with fasting off.
+    func fastingStatus(on dayKey: String) -> FastingDayStatus? {
+        guard let settings else { return nil }
+        return days.fastingStatus(
+            on: dayKey,
+            hijri: settings.hijriPreferences,
+            fasting: settings.fastingPreferences,
+            timeZone: displayTimeZone
+        )
+    }
+
+    /// Fasting days from today through `limitDays` ahead, for listing rather than reminding.
+    /// Runs past the cached days: the weekday needs no timings and the Hijri date falls back
+    /// to arithmetic, so the list is the same length whichever month the cache ends in.
+    func fastingDays(withinDays limitDays: Int) -> [FastingDayStatus] {
+        let todayKey = todayKey
+        return (0...limitDays).compactMap { offset in
+            guard let key = DayKey.shifted(todayKey, by: offset),
+                  let status = fastingStatus(on: key), status.isFast else { return nil }
+            return status
+        }
+    }
+
+    /// Fasting days within `limitDays` of today whose reminder could still fire. Starts at
+    /// today rather than tomorrow: today's evening-before has passed, but a fixed reminder
+    /// time after midnight hasn't necessarily, and the scheduler drops what's spent. A day
+    /// whose reasons don't want an eve reminder — every Ramadan day but the first — is left out.
+    func upcomingFastingDays(limitDays: Int) -> [FastingDay] {
+        guard let settings, settings.fastingEnabled else { return [] }
+        let todayKey = todayKey
+        return (0...limitDays).compactMap { offset in
+            guard let key = DayKey.shifted(todayKey, by: offset), let day = days[key],
+                  let eveKey = DayKey.previous(key), let eve = days[eveKey],
+                  let status = fastingStatus(on: key),
+                  status.reasons.contains(where: { $0.remindsOnEve(of: status.hijri) }) else { return nil }
+            return FastingDay(dayKey: key, hijri: status.hijri, reasons: status.reasons, fajr: day.fajr, eve: eve)
+        }
+    }
 
     /// The next actual prayer after `now`. Sunrise is skipped — it is a boundary, not a prayer.
     var nextEvent: PrayerEvent? {
@@ -301,7 +406,7 @@ final class PrayerTimesStore {
         } ?? .greatestFiniteMagnitude
 
         if moved > Self.significantMoveMetres {
-            days = [:]
+            rawDays = [:]
             fetchedMonths = []
             placeName = nil
             rebuildEvents()
@@ -323,7 +428,7 @@ final class PrayerTimesStore {
             guard let self else { return }
 
             if force {
-                days = [:]
+                rawDays = [:]
                 fetchedMonths = []
                 rebuildEvents()
             }
@@ -336,7 +441,7 @@ final class PrayerTimesStore {
                 return
             }
 
-            if days.isEmpty { loadState = .loading }
+            if rawDays.isEmpty { loadState = .loading }
 
             let method = settings?.calculationMethod ?? CalculationMethod.defaultID
             let school = settings?.asrSchool.rawValue ?? AsrSchool.standard.rawValue
@@ -357,7 +462,7 @@ final class PrayerTimesStore {
                         school: school
                     )
                     guard !Task.isCancelled else { return }
-                    for day in result { days[day.dayKey] = day }
+                    for day in result { rawDays[day.dayKey] = day }
                     fetchedMonths.insert(key)
                     fetchedAny = true
                 } catch {
@@ -377,8 +482,8 @@ final class PrayerTimesStore {
             if let failure {
                 // Keep showing whatever we have; a menubar that goes blank when the wifi
                 // drops is worse than one that admits it is out of date.
-                isStale = !days.isEmpty
-                loadState = days.isEmpty ? .failed(failure) : .loaded
+                isStale = !rawDays.isEmpty
+                loadState = rawDays.isEmpty ? .failed(failure) : .loaded
             } else {
                 isStale = false
                 loadState = .loaded
@@ -404,13 +509,17 @@ final class PrayerTimesStore {
     }
 
     private func rebuildEvents() {
+        days = rawDays.adjusted(by: settings?.adhanAdjustments ?? PrayerAdjustments())
         sortedEvents = days.values.flatMap(\.events).sorted { $0.date < $1.date }
         menuBar = makeMenuBarContent(at: now, iqamah: lastIqamah)
     }
 
     private func pruneOldDays() {
-        let cutoff = DayKey.make(for: now.addingTimeInterval(-86_400), in: displayTimeZone)
-        days = days.filter { $0.key >= cutoff }
+        // Three days back rather than one: a Hijri adjustment of −2 reads today's date off
+        // the day before yesterday's entry, and a pruned entry means a computed fallback that
+        // may not match the API's.
+        let cutoff = DayKey.make(for: now.addingTimeInterval(-3 * 86_400), in: displayTimeZone)
+        rawDays = rawDays.filter { $0.key >= cutoff }
         // A month whose days were partly pruned must not look fully cached any more.
         fetchedMonths = fetchedMonths.filter { $0 >= String(cutoff.prefix(7)) }
     }
@@ -474,9 +583,17 @@ final class PrayerTimesStore {
         decoder.dateDecodingStrategy = .iso8601
         guard let cache = try? decoder.decode(PrayerCacheFile.self, from: data) else { return }
 
-        days = cache.days
+        rawDays = cache.days
         fetchedMonths = Set(cache.fetchedMonths)
         placeName = cache.placeName
+        // A cache from before the structured Hijri date existed has the string and nothing
+        // else. Forgetting the months were fetched makes the next refresh fetch them again —
+        // once — and overwrite each day in place. Only days from today on count: a refresh
+        // never refetches last month, so a leftover from it would trip this every launch.
+        let today = DayKey.make(for: now, in: displayTimeZone)
+        if rawDays.contains(where: { $0.key >= today && $0.value.hijriDate == nil }) {
+            fetchedMonths = []
+        }
         cachedMethod = cache.method
         cachedSchool = cache.school
         if let latitude = cache.latitude, let longitude = cache.longitude {
@@ -486,18 +603,29 @@ final class PrayerTimesStore {
         pruneOldDays()
     }
 
+    /// Rewrites the cache with the current preferences and nothing else changed. The widget
+    /// reads its copy of this file, not defaults, so a preference has to be written here to
+    /// reach it at all.
+    func syncPreferencesToCache() {
+        guard !rawDays.isEmpty else { return }
+        persist(method: cachedMethod, school: cachedSchool)
+    }
+
     private func persist(method: Int, school: Int) {
         cachedMethod = method
         cachedSchool = school
 
         let cache = PrayerCacheFile(
-            days: days,
+            days: rawDays,
             fetchedMonths: Array(fetchedMonths),
             latitude: coordinate?.latitude,
             longitude: coordinate?.longitude,
             placeName: placeName,
             method: method,
-            school: school
+            school: school,
+            hijri: settings?.hijriPreferences,
+            fasting: settings?.fastingPreferences,
+            adjustments: settings?.adhanAdjustments
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

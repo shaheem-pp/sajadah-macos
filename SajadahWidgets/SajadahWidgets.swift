@@ -157,10 +157,19 @@ struct PrayerTimesView: View {
                     Text(entry.snapshot.placeName ?? "Today")
                         .font(.caption).fontWeight(.medium)
                     Spacer(minLength: 6)
-                    Text(day.hijri)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    HStack(spacing: 4) {
+                        if let fasting = entry.snapshot.fastingIndicator(at: entry.date) {
+                            FastingIndicatorText(indicator: fasting)
+                                .fontWeight(.medium)
+                                .foregroundStyle(Theme.brass)
+                            Text("·").foregroundStyle(.quaternary)
+                        }
+                        Text(entry.snapshot.displayedHijriDate(at: entry.date)?.formatted ?? day.hijri)
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 }
                 .padding(.bottom, 1)
 
@@ -210,6 +219,22 @@ struct PrayerTimesView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
             WidgetEmptyView(message: "Open Sajadah to load prayer times.")
+        }
+    }
+}
+
+/// The short form of the fasting label: a widget header has no room for which day it is.
+/// The iftar clock goes through `Text(_:style:)` like every other time in the widgets, so it
+/// follows the user's locale rather than a format string.
+private struct FastingIndicatorText: View {
+    let indicator: FastingIndicator
+
+    var body: some View {
+        switch indicator {
+        case .fastingToday: Text("Fasting day")
+        case .fastingTomorrow: Text("Fasting tomorrow")
+        case .iftar(let maghrib): Text("Iftar \(Text(maghrib, style: .time))")
+        case .ramadanTomorrow: Text("Ramadan tomorrow")
         }
     }
 }

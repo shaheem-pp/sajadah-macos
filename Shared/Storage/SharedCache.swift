@@ -17,6 +17,12 @@ nonisolated struct PrayerCacheFile: Codable, Sendable {
     var placeName: String?
     var method: Int
     var school: Int
+    /// Lives in defaults too, but the widget can only read this file. Optional so a file
+    /// written before it existed still decodes.
+    var hijri: HijriPreferences?
+    var fasting: FastingPreferences?
+    /// `days` are the API's own times; these are applied on the way out, by app and widget alike.
+    var adjustments: PrayerAdjustments?
 }
 
 nonisolated struct DailyAyahCache: Codable, Sendable {
@@ -51,6 +57,8 @@ nonisolated struct SajadahSnapshot: Sendable {
     var days: [String: DayTimings] = [:]
     var log: [String: DayLog] = [:]
     var placeName: String?
+    var hijri = HijriPreferences()
+    var fasting = FastingPreferences()
     var dailyAyah: DailyAyah?
     var iqamah: IqamahTimes?
     /// The host of whatever page `iqamah` was scraped from (e.g. "mwcanada.org") — a trust
@@ -72,6 +80,16 @@ nonisolated struct SajadahSnapshot: Sendable {
 
     func today(at date: Date) -> DayTimings? {
         days[dayKey(for: date)]
+    }
+
+    /// Adjusted, and past Maghrib already tomorrow's — the same rule the app applies.
+    func displayedHijriDate(at date: Date) -> HijriDate? {
+        days.displayedHijriDate(at: date, preferences: hijri, timeZone: timeZone)
+    }
+
+    /// Worded by the widget itself, which has no room for which day it is.
+    func fastingIndicator(at date: Date) -> FastingIndicator? {
+        days.fastingIndicator(at: date, hijri: hijri, fasting: fasting, timeZone: timeZone)
     }
 
     func nextEvent(after date: Date) -> PrayerEvent? {
@@ -96,8 +114,11 @@ nonisolated struct SajadahSnapshot: Sendable {
         var snapshot = SajadahSnapshot()
 
         if let cache: PrayerCacheFile = decode(CacheFileName.prayerTimes, isoDates: true) {
-            snapshot.days = cache.days
+            // The same arithmetic the app does, so a widget never shows a different minute.
+            snapshot.days = cache.days.adjusted(by: cache.adjustments ?? PrayerAdjustments())
             snapshot.placeName = cache.placeName
+            snapshot.hijri = cache.hijri ?? HijriPreferences()
+            snapshot.fasting = cache.fasting ?? FastingPreferences()
         }
         snapshot.log = decode(CacheFileName.prayerLog) ?? [:]
         if let daily: DailyAyahCache = decode(CacheFileName.dailyAyah) {

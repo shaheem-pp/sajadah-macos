@@ -31,6 +31,79 @@ final class AppSettings {
         }
     }
 
+    // MARK: Adhan adjustments
+
+    /// Off by default. The five offsets below survive the switch being turned off, so it can
+    /// be flipped to compare against the computed times and flipped back.
+    var adhanAdjustmentsEnabled: Bool {
+        didSet {
+            guard adhanAdjustmentsEnabled != oldValue else { return }
+            defaults.set(adhanAdjustmentsEnabled, forKey: Key.adhanAdjustmentsEnabled)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    /// Minutes added to each computed Adhan. Negative moves it earlier.
+    var adhanAdjustmentFajr: Int {
+        didSet {
+            guard adhanAdjustmentFajr != oldValue else { return }
+            defaults.set(adhanAdjustmentFajr, forKey: Key.adhanAdjustmentFajr)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    var adhanAdjustmentDhuhr: Int {
+        didSet {
+            guard adhanAdjustmentDhuhr != oldValue else { return }
+            defaults.set(adhanAdjustmentDhuhr, forKey: Key.adhanAdjustmentDhuhr)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    var adhanAdjustmentAsr: Int {
+        didSet {
+            guard adhanAdjustmentAsr != oldValue else { return }
+            defaults.set(adhanAdjustmentAsr, forKey: Key.adhanAdjustmentAsr)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    var adhanAdjustmentMaghrib: Int {
+        didSet {
+            guard adhanAdjustmentMaghrib != oldValue else { return }
+            defaults.set(adhanAdjustmentMaghrib, forKey: Key.adhanAdjustmentMaghrib)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    var adhanAdjustmentIsha: Int {
+        didSet {
+            guard adhanAdjustmentIsha != oldValue else { return }
+            defaults.set(adhanAdjustmentIsha, forKey: Key.adhanAdjustmentIsha)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    var adhanAdjustments: PrayerAdjustments {
+        PrayerAdjustments(
+            enabled: adhanAdjustmentsEnabled,
+            fajr: adhanAdjustmentFajr,
+            dhuhr: adhanAdjustmentDhuhr,
+            asr: adhanAdjustmentAsr,
+            maghrib: adhanAdjustmentMaghrib,
+            isha: adhanAdjustmentIsha
+        )
+    }
+
+    /// Back to the computed times, with the switch left as it is.
+    func resetAdhanAdjustments() {
+        adhanAdjustmentFajr = 0
+        adhanAdjustmentDhuhr = 0
+        adhanAdjustmentAsr = 0
+        adhanAdjustmentMaghrib = 0
+        adhanAdjustmentIsha = 0
+    }
+
     // MARK: Notifications
 
     var notificationsEnabled: Bool {
@@ -255,6 +328,131 @@ final class AppSettings {
         }
     }
 
+    // MARK: Hijri
+
+    /// Days to shift the Hijri date by, −2…2. See `HijriPreferences`.
+    var hijriAdjustmentDays: Int {
+        didSet {
+            guard hijriAdjustmentDays != oldValue else { return }
+            defaults.set(hijriAdjustmentDays, forKey: Key.hijriAdjustmentDays)
+            onCalendarChanged?()
+        }
+    }
+
+    var hijriChangesAtMaghrib: Bool {
+        didSet {
+            guard hijriChangesAtMaghrib != oldValue else { return }
+            defaults.set(hijriChangesAtMaghrib, forKey: Key.hijriChangesAtMaghrib)
+            onCalendarChanged?()
+        }
+    }
+
+    var hijriPreferences: HijriPreferences {
+        HijriPreferences(adjustmentDays: hijriAdjustmentDays, changesAtMaghrib: hijriChangesAtMaghrib)
+    }
+
+    // MARK: Fasting
+
+    /// Off by default, for the same reason the daily Quran reminder is: a feature nobody asked
+    /// for that starts sending notifications is how an app gets muted.
+    var fastingEnabled: Bool {
+        didSet {
+            guard fastingEnabled != oldValue else { return }
+            defaults.set(fastingEnabled, forKey: Key.fastingEnabled)
+            onCalendarChanged?()
+        }
+    }
+
+    var fastingMondayThursday: Bool {
+        didSet {
+            guard fastingMondayThursday != oldValue else { return }
+            defaults.set(fastingMondayThursday, forKey: Key.fastingMondayThursday)
+            onCalendarChanged?()
+        }
+    }
+
+    var fastingWhiteDays: Bool {
+        didSet {
+            guard fastingWhiteDays != oldValue else { return }
+            defaults.set(fastingWhiteDays, forKey: Key.fastingWhiteDays)
+            onCalendarChanged?()
+        }
+    }
+
+    var fastingAshura: Bool {
+        didSet {
+            guard fastingAshura != oldValue else { return }
+            defaults.set(fastingAshura, forKey: Key.fastingAshura)
+            onCalendarChanged?()
+        }
+    }
+
+    var fastingArafah: Bool {
+        didSet {
+            guard fastingArafah != oldValue else { return }
+            defaults.set(fastingArafah, forKey: Key.fastingArafah)
+            onCalendarChanged?()
+        }
+    }
+
+    var fastingPreferences: FastingPreferences {
+        FastingPreferences(
+            enabled: fastingEnabled,
+            mondayThursday: fastingMondayThursday,
+            whiteDays: fastingWhiteDays,
+            ashura: fastingAshura,
+            arafah: fastingArafah
+        )
+    }
+
+    /// The evening before a fast is when it is decided on, and Maghrib is when that evening
+    /// begins — so the default hangs off the prayer time rather than the clock.
+    enum FastingReminderMode: String, Sendable, CaseIterable {
+        case afterMaghrib
+        case fixedTime
+    }
+
+    var fastingRemindersEnabled: Bool {
+        didSet {
+            guard fastingRemindersEnabled != oldValue else { return }
+            defaults.set(fastingRemindersEnabled, forKey: Key.fastingRemindersEnabled)
+            onNotificationPreferencesChanged?()
+        }
+    }
+
+    var fastingReminderMode: FastingReminderMode {
+        didSet {
+            guard fastingReminderMode != oldValue else { return }
+            defaults.set(fastingReminderMode.rawValue, forKey: Key.fastingReminderMode)
+            onNotificationPreferencesChanged?()
+        }
+    }
+
+    var fastingReminderMinutesAfterMaghrib: Int {
+        didSet {
+            guard fastingReminderMinutesAfterMaghrib != oldValue else { return }
+            defaults.set(fastingReminderMinutesAfterMaghrib, forKey: Key.fastingReminderMinutesAfterMaghrib)
+            onNotificationPreferencesChanged?()
+        }
+    }
+
+    /// Minutes from midnight, on the evening before the fast.
+    var fastingReminderMinutes: Int {
+        didSet {
+            guard fastingReminderMinutes != oldValue else { return }
+            defaults.set(fastingReminderMinutes, forKey: Key.fastingReminderMinutes)
+            onNotificationPreferencesChanged?()
+        }
+    }
+
+    /// The invite in the main window, once closed, stays closed.
+    var fastingInviteDismissed: Bool {
+        didSet {
+            guard fastingInviteDismissed != oldValue else { return }
+            defaults.set(fastingInviteDismissed, forKey: Key.fastingInviteDismissed)
+        }
+    }
+
     // MARK: Display
 
     var use24HourClock: Bool {
@@ -293,6 +491,9 @@ final class AppSettings {
 
     /// Called when a change invalidates cached timings (method or Asr school).
     var onCalculationChanged: (() -> Void)?
+    /// Called when the Adhan adjustments change. The cached timings stay valid — they are
+    /// re-read through the new offsets, not refetched.
+    var onAdhanAdjustmentsChanged: (() -> Void)?
     /// Called when a change invalidates cached Quran text (translation edition).
     var onTranslationChanged: (() -> Void)?
     /// Called when the set of notifications that should be pending changes.
@@ -300,6 +501,11 @@ final class AppSettings {
     /// Called when anything about where Iqamah times come from changes — the mode, the URL, or
     /// any offset — so the Iqamah store can re-derive them.
     var onIqamahSourceChanged: (() -> Void)?
+
+    /// Anything that changes what the Hijri date reads or which days are fasting days. The
+    /// widget takes both from the timings cache rather than from defaults, so the cache has to
+    /// be rewritten, not just observed.
+    var onCalendarChanged: (() -> Void)?
 
     // MARK: Init
 
@@ -311,6 +517,12 @@ final class AppSettings {
         calculationMethod = defaults.object(forKey: Key.calculationMethod) as? Int
             ?? CalculationMethod.defaultID
         asrSchool = AsrSchool(rawValue: defaults.integer(forKey: Key.asrSchool)) ?? .standard
+        adhanAdjustmentsEnabled = defaults.object(forKey: Key.adhanAdjustmentsEnabled) as? Bool ?? false
+        adhanAdjustmentFajr = defaults.object(forKey: Key.adhanAdjustmentFajr) as? Int ?? 0
+        adhanAdjustmentDhuhr = defaults.object(forKey: Key.adhanAdjustmentDhuhr) as? Int ?? 0
+        adhanAdjustmentAsr = defaults.object(forKey: Key.adhanAdjustmentAsr) as? Int ?? 0
+        adhanAdjustmentMaghrib = defaults.object(forKey: Key.adhanAdjustmentMaghrib) as? Int ?? 0
+        adhanAdjustmentIsha = defaults.object(forKey: Key.adhanAdjustmentIsha) as? Int ?? 0
         notificationsEnabled = defaults.object(forKey: Key.notificationsEnabled) as? Bool ?? true
         enabledPrayers = (defaults.array(forKey: Key.enabledPrayers) as? [String])
             .map { Set($0.compactMap(Prayer.init(rawValue:))) }
@@ -329,6 +541,19 @@ final class AppSettings {
         fridayKahfMinutes = defaults.object(forKey: Key.fridayKahfMinutes) as? Int ?? (9 * 60)
         quranReminderEnabled = defaults.object(forKey: Key.quranReminderEnabled) as? Bool ?? false
         quranReminderMinutes = defaults.object(forKey: Key.quranReminderMinutes) as? Int ?? (20 * 60)
+        hijriAdjustmentDays = defaults.object(forKey: Key.hijriAdjustmentDays) as? Int ?? 0
+        hijriChangesAtMaghrib = defaults.object(forKey: Key.hijriChangesAtMaghrib) as? Bool ?? true
+        fastingEnabled = defaults.object(forKey: Key.fastingEnabled) as? Bool ?? false
+        fastingMondayThursday = defaults.object(forKey: Key.fastingMondayThursday) as? Bool ?? true
+        fastingWhiteDays = defaults.object(forKey: Key.fastingWhiteDays) as? Bool ?? true
+        fastingAshura = defaults.object(forKey: Key.fastingAshura) as? Bool ?? true
+        fastingArafah = defaults.object(forKey: Key.fastingArafah) as? Bool ?? true
+        fastingRemindersEnabled = defaults.object(forKey: Key.fastingRemindersEnabled) as? Bool ?? true
+        fastingReminderMode = defaults.string(forKey: Key.fastingReminderMode)
+            .flatMap(FastingReminderMode.init(rawValue:)) ?? .afterMaghrib
+        fastingReminderMinutesAfterMaghrib = defaults.object(forKey: Key.fastingReminderMinutesAfterMaghrib) as? Int ?? 30
+        fastingReminderMinutes = defaults.object(forKey: Key.fastingReminderMinutes) as? Int ?? 20 * 60
+        fastingInviteDismissed = defaults.object(forKey: Key.fastingInviteDismissed) as? Bool ?? false
         use24HourClock = defaults.object(forKey: Key.use24HourClock) as? Bool ?? false
         updateChecksEnabled = defaults.object(forKey: Key.updateChecksEnabled) as? Bool ?? true
         launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -388,6 +613,12 @@ final class AppSettings {
     private enum Key {
         static let calculationMethod = "calculationMethod"
         static let asrSchool = "asrSchool"
+        static let adhanAdjustmentsEnabled = "adhanAdjustmentsEnabled"
+        static let adhanAdjustmentFajr = "adhanAdjustmentFajr"
+        static let adhanAdjustmentDhuhr = "adhanAdjustmentDhuhr"
+        static let adhanAdjustmentAsr = "adhanAdjustmentAsr"
+        static let adhanAdjustmentMaghrib = "adhanAdjustmentMaghrib"
+        static let adhanAdjustmentIsha = "adhanAdjustmentIsha"
         static let notificationsEnabled = "notificationsEnabled"
         static let enabledPrayers = "enabledPrayers"
         static let reminderOffsetMinutes = "reminderOffsetMinutes"
@@ -404,6 +635,18 @@ final class AppSettings {
         static let fridayKahfMinutes = "fridayKahfMinutes"
         static let quranReminderEnabled = "quranReminderEnabled"
         static let quranReminderMinutes = "quranReminderMinutes"
+        static let hijriAdjustmentDays = "hijriAdjustmentDays"
+        static let hijriChangesAtMaghrib = "hijriChangesAtMaghrib"
+        static let fastingEnabled = "fastingEnabled"
+        static let fastingMondayThursday = "fastingMondayThursday"
+        static let fastingWhiteDays = "fastingWhiteDays"
+        static let fastingAshura = "fastingAshura"
+        static let fastingArafah = "fastingArafah"
+        static let fastingRemindersEnabled = "fastingRemindersEnabled"
+        static let fastingReminderMode = "fastingReminderMode"
+        static let fastingReminderMinutesAfterMaghrib = "fastingReminderMinutesAfterMaghrib"
+        static let fastingReminderMinutes = "fastingReminderMinutes"
+        static let fastingInviteDismissed = "fastingInviteDismissed"
         static let use24HourClock = "use24HourClock"
         static let updateChecksEnabled = "updateChecksEnabled"
         static let iqamahSourceMode = "iqamahSourceMode"

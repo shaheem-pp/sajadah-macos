@@ -34,6 +34,9 @@ struct PrayerListView: View {
     var logging: PrayerLogging?
     var compact: Bool = false
 
+    @Environment(AppNavigation.self) private var navigation
+    @Environment(\.openSettings) private var openSettings
+
     private var showsIqamah: Bool { iqamah != nil }
 
     var body: some View {
@@ -76,7 +79,10 @@ struct PrayerListView: View {
                     // The caption is also the way back to where these times are configured.
                     // A column that says whose times it holds is the natural place to look
                     // when you want to change whose times it holds.
-                    SettingsLink {
+                    Button {
+                        navigation.settingsPane = .masjid
+                        openSettings()
+                    } label: {
                         Text(iqamahSource)
                             .font(.system(size: 9))
                             .textCase(nil)
@@ -93,7 +99,7 @@ struct PrayerListView: View {
             .frame(width: PrayerColumn.iqamah, alignment: .trailing)
 
             if logging != nil {
-                Color.clear.frame(width: PrayerColumn.log, height: 1)
+                Color.clear.frame(width: PrayerColumn.log(compact: compact), height: 1)
             }
         }
         .font(.system(size: 9.5, weight: .semibold))
@@ -112,7 +118,8 @@ struct PrayerListView: View {
 private enum PrayerColumn {
     static let adhan: CGFloat = 76
     static let iqamah: CGFloat = 84
-    static let log: CGFloat = 16
+    /// Follows `LogButton`'s size, so the heading and the sunrise row hold the same width.
+    static func log(compact: Bool) -> CGFloat { compact ? 16 : 18 }
 }
 
 private struct PrayerRow: View {
@@ -125,6 +132,12 @@ private struct PrayerRow: View {
     let showsIqamahColumn: Bool
     let logging: PrayerLogging?
     let compact: Bool
+
+    @State private var isHovering = false
+
+    /// Only the window's rows light up under the pointer: they are the ones with a control
+    /// to press, and the popover's are already dense enough without a second highlight.
+    private var isHoverable: Bool { logging != nil && !compact }
 
     var body: some View {
         HStack(spacing: compact ? 9 : 11) {
@@ -160,12 +173,13 @@ private struct PrayerRow: View {
                         state: logging.state(event.prayer),
                         // A prayer can only be logged once its time has actually come.
                         isEnabled: hasPassed,
-                        action: { logging.cycle(event.prayer) }
+                        action: { logging.cycle(event.prayer) },
+                        size: PrayerColumn.log(compact: compact)
                     )
                 } else {
                     // Sunrise is never logged, but it still has to hold the column open or
                     // its times sit further right than everything above and below them.
-                    Color.clear.frame(width: PrayerColumn.log, height: PrayerColumn.log)
+                    Color.clear.frame(width: PrayerColumn.log(compact: compact), height: PrayerColumn.log(compact: compact))
                 }
             }
         }
@@ -176,8 +190,16 @@ private struct PrayerRow: View {
             if isHighlighted {
                 RoundedRectangle(cornerRadius: Theme.rowRadius, style: .continuous)
                     .fill(event.prayer.tint.opacity(0.14))
+            } else if isHovering {
+                RoundedRectangle(cornerRadius: Theme.rowRadius, style: .continuous)
+                    .fill(Theme.wellFill)
             }
         }
+        .onHover { hovering in
+            guard isHoverable else { return }
+            isHovering = hovering
+        }
+        .animation(.easeOut(duration: 0.15), value: isHovering)
         // A rule down the leading edge marks the row without the fill having to be heavy
         // enough to notice on its own.
         .overlay(alignment: .leading) {
@@ -220,52 +242,5 @@ private struct PrayerRow: View {
     private var iqamahForeground: Color {
         if isHighlighted { return .primary }
         return hasPassed ? .secondary : .primary
-    }
-}
-
-// MARK: - Log button
-
-private struct LogButton: View {
-    let state: PrayerLogState?
-    let isEnabled: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            ZStack {
-                switch state {
-                case .prayed:
-                    Circle().fill(Theme.jade)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 8.5, weight: .bold))
-                        .foregroundStyle(.white)
-
-                case .missed:
-                    Circle().fill(Color.orange.opacity(0.18))
-                    Circle().strokeBorder(Color.orange.opacity(0.55), lineWidth: 1)
-                    Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.orange)
-
-                case nil:
-                    Circle().strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1.2)
-                }
-            }
-            .frame(width: 16, height: 16)
-            .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.25)
-        .animation(.snappy(duration: 0.18), value: state)
-        .help(helpText)
-    }
-
-    private var helpText: String {
-        switch state {
-        case .prayed: "Prayed — click to mark missed"
-        case .missed: "Missed — click to clear"
-        case nil: "Click to mark as prayed"
-        }
     }
 }

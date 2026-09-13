@@ -111,6 +111,7 @@ struct MenuBarContentView: View {
                 ),
                 place: store.placeName ?? "Current location",
                 hijri: store.hijriDateText,
+                fasting: store.fastingIndicator,
                 isStale: store.isStale,
                 progress: windowProgress,
                 compact: true

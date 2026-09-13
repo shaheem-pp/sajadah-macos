@@ -53,6 +53,12 @@ final class AppCoordinator {
         settings.onCalculationChanged = { [store] in
             store.invalidateAndRefresh()
         }
+        settings.onAdhanAdjustmentsChanged = { [store, iqamah, settings] in
+            store.adhanAdjustmentsChanged()
+            // Iqamah computed as minutes after Adhan has to follow the Adhan; a masjid's own
+            // posted times don't, so the scrape is left alone.
+            if settings.iqamahSourceMode == .offset { iqamah.refresh() }
+        }
         settings.onNotificationPreferencesChanged = { [weak self] in
             self?.rescheduleNotifications()
         }
@@ -62,6 +68,13 @@ final class AppCoordinator {
         }
         settings.onIqamahSourceChanged = { [iqamah] in
             iqamah.refresh()
+        }
+        settings.onCalendarChanged = { [weak self] in
+            guard let self else { return }
+            store.syncPreferencesToCache()
+            // Fasting reminders hang off the adjusted date, so they may have moved a day.
+            rescheduleNotifications()
+            WidgetCenter.shared.reloadAllTimelines()
         }
         iqamah.onTimesChanged = { [weak self] in
             // Iqamah reminders are scheduled from these times, so a masjid change has to reach
@@ -197,6 +210,7 @@ final class AppCoordinator {
         await scheduler.reschedule(
             prayers: prayers,
             checkIns: checkIns,
+            fastingDays: store.upcomingFastingDays(limitDays: Self.scheduleHorizonDays),
             answered: answered,
             settings: settings,
             placeName: store.placeName,

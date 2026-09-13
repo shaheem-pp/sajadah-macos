@@ -116,6 +116,10 @@ nonisolated struct AladhanAPI: Sendable {
             // Without this the API returns "04:31 (EDT)", which would need hand-rolled
             // timezone maths. With it, every timing is a fully-offset ISO 8601 instant.
             URLQueryItem(name: "iso8601", value: "true"),
+            // The API's default today, pinned rather than inherited: Umm al-Qura adjusted to
+            // Saudi Arabia's sighting announcements. The offline fallback in `HijriDate` is
+            // chosen to agree with this one, and a silent change of default would break that.
+            URLQueryItem(name: "calendarMethod", value: "HJCoSA"),
         ]
         guard let url = components.url else { throw AladhanError.badURL }
 
@@ -190,11 +194,13 @@ private nonisolated struct CalendarResponse: Decodable {
         }
 
         struct Hijri: Decodable {
+            /// Strings on the wire, unlike `month.number` — the API is not consistent here.
             let day: String
             let year: String
             let month: Month
 
             struct Month: Decodable {
+                let number: Int
                 let en: String
             }
         }
@@ -213,9 +219,13 @@ private extension DayTimings {
         let parts = day.date.gregorian.date.split(separator: "-")
         guard parts.count == 3 else { return nil }
 
+        let hijri = day.date.hijri
         self.init(
             dayKey: "\(parts[2])-\(parts[1])-\(parts[0])",
-            hijri: "\(day.date.hijri.day) \(day.date.hijri.month.en) \(day.date.hijri.year) AH",
+            hijri: "\(hijri.day) \(hijri.month.en) \(hijri.year) AH",
+            hijriDate: Int(hijri.day).flatMap { day in
+                Int(hijri.year).map { HijriDate(day: day, month: hijri.month.number, year: $0) }
+            },
             timeZoneIdentifier: day.meta.timezone,
             fajr: day.timings.fajr,
             sunrise: day.timings.sunrise,

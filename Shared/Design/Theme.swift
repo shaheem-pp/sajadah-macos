@@ -39,6 +39,8 @@ enum Theme {
     static let jade = adaptiveColor(light: 0x0B6E4F, dark: 0x4FCBA0)
     /// Reserved for earned things — streaks, records, ornament.
     static let brass = adaptiveColor(light: 0xA0742A, dark: 0xDFB55F)
+    /// Brass over a hero's sky, which is always darkened: the light-mode brass would vanish.
+    static let brassOnSky = adaptiveColor(light: 0xE8C572, dark: 0xE8C572)
 
     // Surfaces
 

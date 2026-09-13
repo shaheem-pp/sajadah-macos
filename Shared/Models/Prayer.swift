@@ -65,6 +65,10 @@ nonisolated struct DayTimings: Codable, Identifiable, Sendable, Equatable {
     /// timezone changing.
     let dayKey: String
     let hijri: String
+    /// Optional with a default: this struct is the on-disk cache, and a file written before
+    /// the field existed must still decode — in the widget as much as here, where a failed
+    /// decode is a blank widget rather than an error.
+    var hijriDate: HijriDate? = nil
     let timeZoneIdentifier: String
 
     let fajr: Date
@@ -117,19 +121,37 @@ nonisolated enum DayKey {
         String(make(for: date, in: timeZone).prefix(7))
     }
 
-    /// The day before `key`. Arithmetic is done in UTC so it walks calendar labels rather
-    /// than instants — stepping back a day must never be affected by a DST transition.
-    static func previous(_ key: String) -> String? {
+    /// The day before `key`.
+    static func previous(_ key: String) -> String? { shifted(key, by: -1) }
+
+    /// The day after `key`.
+    static func next(_ key: String) -> String? { shifted(key, by: 1) }
+
+    /// `key` moved by `days`. Arithmetic is done in UTC so it walks calendar labels rather
+    /// than instants — stepping a day must never be affected by a DST transition.
+    static func shifted(_ key: String, by days: Int) -> String? {
+        guard let date = date(key, in: Self.utc.timeZone),
+              let shifted = Self.utc.date(byAdding: .day, value: days, to: date) else { return nil }
+        return make(for: shifted, in: Self.utc.timeZone)
+    }
+
+    /// Noon of `key` in `timeZone`. Noon rather than midnight for the same reason the Isha
+    /// cutoff anchors on Dhuhr: midday is unambiguously inside the right local day, where
+    /// midnight sits on the edge of two.
+    static func date(_ key: String, in timeZone: TimeZone) -> Date? {
         let parts = key.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
 
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
-        let components = DateComponents(year: parts[0], month: parts[1], day: parts[2])
-        guard let date = calendar.date(from: components),
-              let previous = calendar.date(byAdding: .day, value: -1, to: date) else { return nil }
-        return make(for: previous, in: calendar.timeZone)
+        calendar.timeZone = timeZone
+        return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: 12))
     }
+
+    private static let utc: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        return calendar
+    }()
 }
 
 // MARK: - Prayer Windows
@@ -150,14 +172,17 @@ extension DayTimings {
     }
 
     private func ishaCutoff(minutesFromMidnight: Int) -> Date? {
+        guard let cutoff = localTime(minutesFromMidnight: minutesFromMidnight) else { return nil }
+        // At high latitudes Isha can fall after the cutoff, leaving nothing sensible to ask.
+        return cutoff > isha ? cutoff : nil
+    }
+
+    /// A clock time on this day, in its own timezone.
+    func localTime(minutesFromMidnight: Int) -> Date? {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         // Anchored on Dhuhr because midday is unambiguously inside the right local day.
         let midnight = calendar.startOfDay(for: dhuhr)
-        guard let cutoff = calendar.date(byAdding: .minute, value: minutesFromMidnight, to: midnight) else {
-            return nil
-        }
-        // At high latitudes Isha can fall after the cutoff, leaving nothing sensible to ask.
-        return cutoff > isha ? cutoff : nil
+        return calendar.date(byAdding: .minute, value: minutesFromMidnight, to: midnight)
     }
 }

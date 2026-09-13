@@ -37,11 +37,20 @@ final class PrayerLogStore {
     // MARK: Writing
 
     func set(_ state: PrayerLogState?, for prayer: Prayer, on dayKey: String) {
-        guard prayer.isPrayer else { return }
-        var day = days[dayKey] ?? DayLog()
-        guard day.state(for: prayer) != state else { return }
+        set(state, for: [prayer], on: dayKey)
+    }
 
-        day.set(state, for: prayer)
+    /// One write for several prayers. `onChange` reschedules notifications and reloads every
+    /// widget, so logging a whole day as five separate writes would do that five times over.
+    func set(_ state: PrayerLogState?, for prayers: some Sequence<Prayer>, on dayKey: String) {
+        var day = days[dayKey] ?? DayLog()
+        var changed = false
+        for prayer in prayers where prayer.isPrayer && day.state(for: prayer) != state {
+            day.set(state, for: prayer)
+            changed = true
+        }
+        guard changed else { return }
+
         if day.prayed.isEmpty && day.missed.isEmpty {
             days.removeValue(forKey: dayKey)
         } else {
