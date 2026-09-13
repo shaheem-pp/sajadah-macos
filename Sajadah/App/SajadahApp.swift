@@ -51,5 +51,8 @@ struct SajadahApp: App {
             SettingsView()
                 .sajadahEnvironment(app)
         }
+        // The view fixes its width and leaves height free; without this the window ignores
+        // both and opens at the split view's minimum.
+        .windowResizability(.contentSize)
     }
 }

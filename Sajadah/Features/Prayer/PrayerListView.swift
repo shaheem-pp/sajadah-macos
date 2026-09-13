@@ -34,6 +34,9 @@ struct PrayerListView: View {
     var logging: PrayerLogging?
     var compact: Bool = false
 
+    @Environment(AppNavigation.self) private var navigation
+    @Environment(\.openSettings) private var openSettings
+
     private var showsIqamah: Bool { iqamah != nil }
 
     var body: some View {
@@ -76,7 +79,10 @@ struct PrayerListView: View {
                     // The caption is also the way back to where these times are configured.
                     // A column that says whose times it holds is the natural place to look
                     // when you want to change whose times it holds.
-                    SettingsLink {
+                    Button {
+                        navigation.settingsPane = .masjid
+                        openSettings()
+                    } label: {
                         Text(iqamahSource)
                             .font(.system(size: 9))
                             .textCase(nil)

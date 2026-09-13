@@ -14,6 +14,8 @@ struct HomeView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(PrayerLogStore.self) private var log
     @Environment(IqamahStore.self) private var iqamah
+    @Environment(AppNavigation.self) private var navigation
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         // Derived once and handed down: the panel and the table have to be describing the
@@ -116,8 +118,11 @@ struct HomeView: View {
 
             Spacer(minLength: 8)
 
-            SettingsLink {
-                Text("Set Up…")
+            // Not a `SettingsLink`: that opens whichever pane was last used, and an invite
+            // to add a masjid should land on the form that adds one.
+            Button("Set Up…") {
+                navigation.settingsPane = .masjid
+                openSettings()
             }
             .controlSize(.small)
         }
