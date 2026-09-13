@@ -14,6 +14,7 @@ struct HomeView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(PrayerLogStore.self) private var log
     @Environment(IqamahStore.self) private var iqamah
+    @Environment(QuranStore.self) private var quran
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.openSettings) private var openSettings
 
@@ -38,6 +39,7 @@ struct HomeView: View {
                     fastingInvite
                 }
                 weekAhead
+                ayahOfTheDay
             }
             .padding(22)
             .frame(maxWidth: 720, alignment: .leading)
@@ -276,6 +278,30 @@ struct HomeView: View {
                     }
                 }
                 .sajadahCard(padding: 8)
+            }
+        }
+    }
+
+    // MARK: Ayah of the day
+
+    /// The one thing the popover had that this page didn't, and the bridge from the prayer
+    /// half of the window to the Quran half. Absent rather than empty until the day's verse
+    /// has loaded, as in the popover.
+    @ViewBuilder
+    private var ayahOfTheDay: some View {
+        if let daily = quran.dailyAyah {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionHeader(
+                    title: "Ayah of the day",
+                    trailing: "\(daily.surahEnglishName) \(daily.ref.surah):\(daily.ref.ayah)"
+                )
+
+                AyahOfTheDayView(ayah: daily, arabicFont: settings.arabicFontName, style: .card) {
+                    // In-window: the sidebar and detail both follow `navigation.selection`,
+                    // so this lands in the reader at the ayah with no window to bring forward.
+                    navigation.open(daily.ref)
+                }
+                .sajadahCard()
             }
         }
     }

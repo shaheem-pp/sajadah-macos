@@ -14,7 +14,7 @@
 
 The menubar item shows the next prayer and the time remaining — `🌙 Asr 1h 23m`. Clicking it
 opens a popover with today's full timings and the verse of the day; the main window holds the
-week ahead, your prayer streak, and a Quran reader.
+week ahead, your prayer streak, the verse of the day, and a Quran reader.
 
 Timings come from the [Aladhan API](https://aladhan.com/prayer-times-api), the Quran from
 [alquran.cloud](https://alquran.cloud/api), and your position from CoreLocation.
