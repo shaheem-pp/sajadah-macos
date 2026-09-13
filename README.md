@@ -152,7 +152,7 @@ Widgets used to be listed here too. They now work on unsigned builds; see
 
 - Menubar countdown to the next prayer, redrawn only when the text actually changes — and only woken once a minute unless a seconds countdown is on screen
 - Popover with today's six timings, the current place, and the Hijri date — which turns over at Maghrib, when the Islamic day begins, or at midnight if you'd rather match a printed calendar
-- Full window with today plus the next 7 days
+- Full window with today, the fasts in the fortnight ahead, and the next 7 days — two columns when the window is wide enough, one when it isn't
 - Local notifications at prayer time, with per-prayer toggles and an optional "N minutes before" offset
 - Iqamah reminders a configurable number of minutes before your masjid's congregation time
 - Two-stage check-ins that ask whether you prayed — shortly after the Adhan, and once more as the window closes — with Yes/No buttons right on the notification
@@ -306,7 +306,9 @@ its Iqamah still ahead, the display retargets to that Iqamah instead of silently
 
 The main window is a `NavigationSplitView`: prayer times and the Quran share one window. The
 location permission flow lives inside the prayer pane only, so a denied location never blocks
-reading.
+reading. The Today page lays itself out by width: two columns when there is room — the panel
+and the day's rows on the left, the streak, the fasts ahead and the verse on the right, the
+week table under both — and one column, top to bottom in that order, when there isn't.
 
 **`QuranAPI`** fetches Arabic and translation in a single request per surah
 (`/v1/surah/{n}/editions/quran-uthmani,{translation}`) and normalises the text before anything
@@ -370,7 +372,9 @@ Ramadan has no switch — there is no choice to make about it — and is treated
 both directions. The label beside the date is the time of iftar rather than "fasting day",
 since the date beside it already says which day of the month it is, and the only reminder is
 the one the evening before the 1st: a month of nightly "fasting tomorrow" is the notification
-nobody in Ramadan needs.
+nobody in Ramadan needs. The Today page's Fasting card carries the day of the month with suhoor
+and iftar for it — tomorrow's once Maghrib has passed — and, outside Ramadan, the fasts in the
+fortnight ahead; the week table marks them too.
 
 The reminder lands the evening *before* the fast, because that is when a fast is decided on —
 after Maghrib by default, which is also when the Islamic day begins, or at a clock time of your

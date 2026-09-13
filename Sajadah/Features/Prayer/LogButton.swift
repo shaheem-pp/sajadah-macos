@@ -12,6 +12,9 @@ struct LogButton: View {
     let state: PrayerLogState?
     let isEnabled: Bool
     let action: () -> Void
+    /// The popover and the day editor keep the circle small; the window, with room to spare,
+    /// draws it a size up so the one control on the page that does something reads as one.
+    var size: CGFloat = 16
 
     var body: some View {
         Button(action: action) {
@@ -20,21 +23,21 @@ struct LogButton: View {
                 case .prayed:
                     Circle().fill(Theme.jade)
                     Image(systemName: "checkmark")
-                        .font(.system(size: 8.5, weight: .bold))
+                        .font(.system(size: size * 0.53, weight: .bold))
                         .foregroundStyle(.white)
 
                 case .missed:
                     Circle().fill(Color.orange.opacity(0.18))
                     Circle().strokeBorder(Color.orange.opacity(0.55), lineWidth: 1)
                     Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: size * 0.5, weight: .bold))
                         .foregroundStyle(.orange)
 
                 case nil:
                     Circle().strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1.2)
                 }
             }
-            .frame(width: 16, height: 16)
+            .frame(width: size, height: size)
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
