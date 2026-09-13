@@ -17,6 +17,9 @@ struct HomeView: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.openSettings) private var openSettings
 
+    /// The streak-grid day whose editor is open, if any.
+    @State private var editingDayKey: String?
+
     var body: some View {
         // Derived once and handed down: the panel and the table have to be describing the
         // same moment, and asking twice invites them to drift a tick apart.
@@ -180,16 +183,49 @@ struct HomeView: View {
 
                 HStack(spacing: 4) {
                     ForEach(recent, id: \.dayKey) { entry in
-                        DayCell(
-                            prayed: entry.log?.prayed.count ?? 0,
-                            isToday: entry.dayKey == store.todayKey
-                        )
-                        .help("\(entry.dayKey) — \(entry.log?.prayed.count ?? 0)/\(DayLog.tracked.count) prayed")
+                        let title = dayTitle(entry.dayKey)
+                        Button {
+                            editingDayKey = entry.dayKey
+                        } label: {
+                            DayCell(
+                                prayed: entry.log?.prayed.count ?? 0,
+                                isToday: entry.dayKey == store.todayKey
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .help("\(title) — \(entry.log?.prayed.count ?? 0)/\(DayLog.tracked.count) prayed. Click to edit.")
+                        .popover(isPresented: editorBinding(for: entry.dayKey), arrowEdge: .bottom) {
+                            DayLogEditor(
+                                dayKey: entry.dayKey,
+                                title: title,
+                                loggable: loggablePrayers(on: entry.dayKey)
+                            )
+                        }
                     }
                 }
             }
             .sajadahCard()
         }
+    }
+
+    private func editorBinding(for dayKey: String) -> Binding<Bool> {
+        Binding(
+            get: { editingDayKey == dayKey },
+            set: { if !$0 { editingDayKey = nil } }
+        )
+    }
+
+    private func dayTitle(_ dayKey: String) -> String {
+        DayKey.date(dayKey, in: store.displayTimeZone)
+            .map { TimeFormatting.weekday($0, timeZone: store.displayTimeZone) } ?? dayKey
+    }
+
+    /// The grid never shows a future day, so anything but today is fully loggable. Today keeps
+    /// the list's rule: a prayer can be logged only once its time has come.
+    private func loggablePrayers(on dayKey: String) -> Set<Prayer> {
+        guard dayKey == store.todayKey else { return Set(DayLog.tracked) }
+        guard let today = store.today else { return [] }
+        return Set(DayLog.tracked.filter { today.time(for: $0) < store.now })
     }
 
     // MARK: Week ahead
