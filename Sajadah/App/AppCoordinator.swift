@@ -63,6 +63,10 @@ final class AppCoordinator {
         settings.onIqamahSourceChanged = { [iqamah] in
             iqamah.refresh()
         }
+        settings.onHijriCalendarChanged = { [store] in
+            store.syncPreferencesToCache()
+            WidgetCenter.shared.reloadAllTimelines()
+        }
         iqamah.onTimesChanged = { [weak self] in
             // Iqamah reminders are scheduled from these times, so a masjid change has to reach
             // the scheduler and not just the widgets.

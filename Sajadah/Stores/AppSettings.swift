@@ -255,6 +255,29 @@ final class AppSettings {
         }
     }
 
+    // MARK: Hijri
+
+    /// Days to shift the Hijri date by, −2…2. See `HijriPreferences`.
+    var hijriAdjustmentDays: Int {
+        didSet {
+            guard hijriAdjustmentDays != oldValue else { return }
+            defaults.set(hijriAdjustmentDays, forKey: Key.hijriAdjustmentDays)
+            onHijriCalendarChanged?()
+        }
+    }
+
+    var hijriChangesAtMaghrib: Bool {
+        didSet {
+            guard hijriChangesAtMaghrib != oldValue else { return }
+            defaults.set(hijriChangesAtMaghrib, forKey: Key.hijriChangesAtMaghrib)
+            onHijriCalendarChanged?()
+        }
+    }
+
+    var hijriPreferences: HijriPreferences {
+        HijriPreferences(adjustmentDays: hijriAdjustmentDays, changesAtMaghrib: hijriChangesAtMaghrib)
+    }
+
     // MARK: Display
 
     var use24HourClock: Bool {
@@ -301,6 +324,10 @@ final class AppSettings {
     /// any offset — so the Iqamah store can re-derive them.
     var onIqamahSourceChanged: (() -> Void)?
 
+    /// Anything that changes what the Hijri date reads. The widget takes that from the timings
+    /// cache rather than from defaults, so the cache has to be rewritten, not just observed.
+    var onHijriCalendarChanged: (() -> Void)?
+
     // MARK: Init
 
     private let defaults: UserDefaults
@@ -329,6 +356,8 @@ final class AppSettings {
         fridayKahfMinutes = defaults.object(forKey: Key.fridayKahfMinutes) as? Int ?? (9 * 60)
         quranReminderEnabled = defaults.object(forKey: Key.quranReminderEnabled) as? Bool ?? false
         quranReminderMinutes = defaults.object(forKey: Key.quranReminderMinutes) as? Int ?? (20 * 60)
+        hijriAdjustmentDays = defaults.object(forKey: Key.hijriAdjustmentDays) as? Int ?? 0
+        hijriChangesAtMaghrib = defaults.object(forKey: Key.hijriChangesAtMaghrib) as? Bool ?? true
         use24HourClock = defaults.object(forKey: Key.use24HourClock) as? Bool ?? false
         updateChecksEnabled = defaults.object(forKey: Key.updateChecksEnabled) as? Bool ?? true
         launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -404,6 +433,8 @@ final class AppSettings {
         static let fridayKahfMinutes = "fridayKahfMinutes"
         static let quranReminderEnabled = "quranReminderEnabled"
         static let quranReminderMinutes = "quranReminderMinutes"
+        static let hijriAdjustmentDays = "hijriAdjustmentDays"
+        static let hijriChangesAtMaghrib = "hijriChangesAtMaghrib"
         static let use24HourClock = "use24HourClock"
         static let updateChecksEnabled = "updateChecksEnabled"
         static let iqamahSourceMode = "iqamahSourceMode"

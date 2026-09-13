@@ -17,6 +17,9 @@ nonisolated struct PrayerCacheFile: Codable, Sendable {
     var placeName: String?
     var method: Int
     var school: Int
+    /// Lives in defaults too, but the widget can only read this file. Optional so a file
+    /// written before it existed still decodes.
+    var hijri: HijriPreferences?
 }
 
 nonisolated struct DailyAyahCache: Codable, Sendable {
@@ -51,6 +54,7 @@ nonisolated struct SajadahSnapshot: Sendable {
     var days: [String: DayTimings] = [:]
     var log: [String: DayLog] = [:]
     var placeName: String?
+    var hijri = HijriPreferences()
     var dailyAyah: DailyAyah?
     var iqamah: IqamahTimes?
     /// The host of whatever page `iqamah` was scraped from (e.g. "mwcanada.org") — a trust
@@ -72,6 +76,11 @@ nonisolated struct SajadahSnapshot: Sendable {
 
     func today(at date: Date) -> DayTimings? {
         days[dayKey(for: date)]
+    }
+
+    /// Adjusted, and past Maghrib already tomorrow's — the same rule the app applies.
+    func displayedHijriDate(at date: Date) -> HijriDate? {
+        days.displayedHijriDate(at: date, preferences: hijri, timeZone: timeZone)
     }
 
     func nextEvent(after date: Date) -> PrayerEvent? {
@@ -98,6 +107,7 @@ nonisolated struct SajadahSnapshot: Sendable {
         if let cache: PrayerCacheFile = decode(CacheFileName.prayerTimes, isoDates: true) {
             snapshot.days = cache.days
             snapshot.placeName = cache.placeName
+            snapshot.hijri = cache.hijri ?? HijriPreferences()
         }
         snapshot.log = decode(CacheFileName.prayerLog) ?? [:]
         if let daily: DailyAyahCache = decode(CacheFileName.dailyAyah) {

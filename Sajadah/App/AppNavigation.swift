@@ -17,6 +17,7 @@ nonisolated enum SidebarItem: Hashable, Sendable {
 nonisolated enum SettingsPane: String, CaseIterable, Identifiable, Sendable {
     case general
     case notifications
+    case fasting
     case quran
     case location
     case masjid

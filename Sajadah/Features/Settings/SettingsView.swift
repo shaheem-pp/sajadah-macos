@@ -47,6 +47,7 @@ struct SettingsView: View {
         switch pane {
         case .general: GeneralSettingsView()
         case .notifications: NotificationSettingsView()
+        case .fasting: FastingSettingsView()
         case .quran: QuranSettingsView()
         case .location: LocationSettingsView()
         case .masjid: MasjidSettingsView()
@@ -59,6 +60,7 @@ extension SettingsPane {
         switch self {
         case .general: "General"
         case .notifications: "Notifications"
+        case .fasting: "Fasting"
         case .quran: "Quran"
         case .location: "Location"
         case .masjid: "Masjid"
@@ -69,6 +71,7 @@ extension SettingsPane {
         switch self {
         case .general: "gearshape"
         case .notifications: "bell"
+        case .fasting: "fork.knife"
         case .quran: "book"
         case .location: "location"
         case .masjid: "building.columns"
@@ -331,6 +334,49 @@ private struct NotificationSettingsView: View {
     /// Isha has no following prayer to bound it, so its window close is a wall-clock time.
     private var ishaCutoff: Binding<Date> {
         timeOfDay(Bindable(settings).ishaCutoffMinutes, fallbackHour: 23)
+    }
+}
+
+// MARK: - Fasting
+
+private struct FastingSettingsView: View {
+    @Environment(AppSettings.self) private var settings
+    @Environment(PrayerTimesStore.self) private var store
+
+    var body: some View {
+        @Bindable var settings = settings
+
+        Form {
+            Section {
+                // Live: the value moves as the stepper does, which is the only way to tell
+                // whether the adjustment went the direction you meant. "Showing" rather than
+                // "Today" because after Maghrib it is, correctly, tomorrow's.
+                LabeledContent("Showing", value: store.hijriDateText ?? "—")
+
+                Stepper(value: $settings.hijriAdjustmentDays, in: -2...2) {
+                    Text(adjustmentLabel)
+                }
+
+                Toggle("Date changes at Maghrib", isOn: $settings.hijriChangesAtMaghrib)
+            } header: {
+                Text("Hijri date")
+            } footer: {
+                Text("Dates come from the Aladhan calendar — Umm al-Qura, adjusted to Saudi Arabia’s official sighting announcements — and can differ from your community’s by a day. Set +1 if your masjid began the month a day earlier. The date shown in Sajadah and its widgets follows this adjustment. The Islamic day begins at sunset; turn the Maghrib switch off to match a printed calendar that changes at midnight.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var adjustmentLabel: String {
+        let days = settings.hijriAdjustmentDays
+        let unit = abs(days) == 1 ? "day" : "days"
+        return switch days {
+        case 0: "No adjustment"
+        case ..<0: "\(-days) \(unit) behind Aladhan"
+        default: "\(days) \(unit) ahead of Aladhan"
+        }
     }
 }
 

@@ -116,7 +116,23 @@ final class PrayerTimesStore {
         days[DayKey.make(for: now, in: displayTimeZone)]
     }
 
-    var hijriDateText: String? { today?.hijri }
+    /// The Hijri date of the civil day `dayKey`, with the user's adjustment applied.
+    func hijriDate(for dayKey: String) -> HijriDate? {
+        days.hijriDate(for: dayKey, adjustedBy: settings?.hijriAdjustmentDays ?? 0, timeZone: displayTimeZone)
+    }
+
+    /// What the date line reads right now — adjusted, and past Maghrib already tomorrow's.
+    var displayedHijriDate: HijriDate? {
+        days.displayedHijriDate(
+            at: now,
+            preferences: settings?.hijriPreferences ?? HijriPreferences(),
+            timeZone: displayTimeZone
+        )
+    }
+
+    /// Falls back to the API's own string for a cache written before the structured date
+    /// existed, so the line never goes blank while the one-time refetch is in flight.
+    var hijriDateText: String? { displayedHijriDate?.formatted ?? today?.hijri }
 
     /// The next actual prayer after `now`. Sunrise is skipped — it is a boundary, not a prayer.
     var nextEvent: PrayerEvent? {
@@ -409,7 +425,10 @@ final class PrayerTimesStore {
     }
 
     private func pruneOldDays() {
-        let cutoff = DayKey.make(for: now.addingTimeInterval(-86_400), in: displayTimeZone)
+        // Three days back rather than one: a Hijri adjustment of −2 reads today's date off
+        // the day before yesterday's entry, and a pruned entry means a computed fallback that
+        // may not match the API's.
+        let cutoff = DayKey.make(for: now.addingTimeInterval(-3 * 86_400), in: displayTimeZone)
         days = days.filter { $0.key >= cutoff }
         // A month whose days were partly pruned must not look fully cached any more.
         fetchedMonths = fetchedMonths.filter { $0 >= String(cutoff.prefix(7)) }
@@ -477,6 +496,14 @@ final class PrayerTimesStore {
         days = cache.days
         fetchedMonths = Set(cache.fetchedMonths)
         placeName = cache.placeName
+        // A cache from before the structured Hijri date existed has the string and nothing
+        // else. Forgetting the months were fetched makes the next refresh fetch them again —
+        // once — and overwrite each day in place. Only days from today on count: a refresh
+        // never refetches last month, so a leftover from it would trip this every launch.
+        let today = DayKey.make(for: now, in: displayTimeZone)
+        if days.contains(where: { $0.key >= today && $0.value.hijriDate == nil }) {
+            fetchedMonths = []
+        }
         cachedMethod = cache.method
         cachedSchool = cache.school
         if let latitude = cache.latitude, let longitude = cache.longitude {
@@ -484,6 +511,14 @@ final class PrayerTimesStore {
             coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         }
         pruneOldDays()
+    }
+
+    /// Rewrites the cache with the current preferences and nothing else changed. The widget
+    /// reads its copy of this file, not defaults, so a preference has to be written here to
+    /// reach it at all.
+    func syncPreferencesToCache() {
+        guard !days.isEmpty else { return }
+        persist(method: cachedMethod, school: cachedSchool)
     }
 
     private func persist(method: Int, school: Int) {
@@ -497,7 +532,8 @@ final class PrayerTimesStore {
             longitude: coordinate?.longitude,
             placeName: placeName,
             method: method,
-            school: school
+            school: school,
+            hijri: settings?.hijriPreferences
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

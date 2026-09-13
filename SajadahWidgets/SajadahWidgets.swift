@@ -157,7 +157,7 @@ struct PrayerTimesView: View {
                     Text(entry.snapshot.placeName ?? "Today")
                         .font(.caption).fontWeight(.medium)
                     Spacer(minLength: 6)
-                    Text(day.hijri)
+                    Text(entry.snapshot.displayedHijriDate(at: entry.date)?.formatted ?? day.hijri)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

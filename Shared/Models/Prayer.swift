@@ -65,6 +65,10 @@ nonisolated struct DayTimings: Codable, Identifiable, Sendable, Equatable {
     /// timezone changing.
     let dayKey: String
     let hijri: String
+    /// Optional with a default: this struct is the on-disk cache, and a file written before
+    /// the field existed must still decode — in the widget as much as here, where a failed
+    /// decode is a blank widget rather than an error.
+    var hijriDate: HijriDate? = nil
     let timeZoneIdentifier: String
 
     let fajr: Date
