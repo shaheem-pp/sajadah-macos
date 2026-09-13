@@ -198,7 +198,7 @@ struct HomeView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.jade)
 
-            Text("Mark Mondays, Thursdays and the white days beside the Hijri date, with a reminder the evening before.")
+            Text("Mark sunnah fasting days — Mondays, Thursdays, the white days, Ashura and Arafah — beside the Hijri date, with a reminder the evening before.")
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
 

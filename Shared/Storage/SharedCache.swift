@@ -85,9 +85,9 @@ nonisolated struct SajadahSnapshot: Sendable {
         days.displayedHijriDate(at: date, preferences: hijri, timeZone: timeZone)
     }
 
-    /// Short form: a widget header has no room for which day it is.
-    func fastingIndicator(at date: Date) -> String? {
-        days.fastingIndicator(at: date, hijri: hijri, fasting: fasting, timeZone: timeZone, compact: true)
+    /// Worded by the widget itself, which has no room for which day it is.
+    func fastingIndicator(at date: Date) -> FastingIndicator? {
+        days.fastingIndicator(at: date, hijri: hijri, fasting: fasting, timeZone: timeZone)
     }
 
     func nextEvent(after date: Date) -> PrayerEvent? {

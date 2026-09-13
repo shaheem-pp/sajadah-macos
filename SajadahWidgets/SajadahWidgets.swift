@@ -159,7 +159,7 @@ struct PrayerTimesView: View {
                     Spacer(minLength: 6)
                     HStack(spacing: 4) {
                         if let fasting = entry.snapshot.fastingIndicator(at: entry.date) {
-                            Text(fasting)
+                            FastingIndicatorText(indicator: fasting)
                                 .fontWeight(.medium)
                                 .foregroundStyle(Theme.brass)
                             Text("·").foregroundStyle(.quaternary)
@@ -219,6 +219,22 @@ struct PrayerTimesView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
             WidgetEmptyView(message: "Open Sajadah to load prayer times.")
+        }
+    }
+}
+
+/// The short form of the fasting label: a widget header has no room for which day it is.
+/// The iftar clock goes through `Text(_:style:)` like every other time in the widgets, so it
+/// follows the user's locale rather than a format string.
+private struct FastingIndicatorText: View {
+    let indicator: FastingIndicator
+
+    var body: some View {
+        switch indicator {
+        case .fastingToday: Text("Fasting day")
+        case .fastingTomorrow: Text("Fasting tomorrow")
+        case .iftar(let maghrib): Text("Iftar \(Text(maghrib, style: .time))")
+        case .ramadanTomorrow: Text("Ramadan tomorrow")
         }
     }
 }

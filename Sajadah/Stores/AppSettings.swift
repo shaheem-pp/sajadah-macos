@@ -306,8 +306,30 @@ final class AppSettings {
         }
     }
 
+    var fastingAshura: Bool {
+        didSet {
+            guard fastingAshura != oldValue else { return }
+            defaults.set(fastingAshura, forKey: Key.fastingAshura)
+            onCalendarChanged?()
+        }
+    }
+
+    var fastingArafah: Bool {
+        didSet {
+            guard fastingArafah != oldValue else { return }
+            defaults.set(fastingArafah, forKey: Key.fastingArafah)
+            onCalendarChanged?()
+        }
+    }
+
     var fastingPreferences: FastingPreferences {
-        FastingPreferences(enabled: fastingEnabled, mondayThursday: fastingMondayThursday, whiteDays: fastingWhiteDays)
+        FastingPreferences(
+            enabled: fastingEnabled,
+            mondayThursday: fastingMondayThursday,
+            whiteDays: fastingWhiteDays,
+            ashura: fastingAshura,
+            arafah: fastingArafah
+        )
     }
 
     /// The evening before a fast is when it is decided on, and Maghrib is when that evening
@@ -442,6 +464,8 @@ final class AppSettings {
         fastingEnabled = defaults.object(forKey: Key.fastingEnabled) as? Bool ?? false
         fastingMondayThursday = defaults.object(forKey: Key.fastingMondayThursday) as? Bool ?? true
         fastingWhiteDays = defaults.object(forKey: Key.fastingWhiteDays) as? Bool ?? true
+        fastingAshura = defaults.object(forKey: Key.fastingAshura) as? Bool ?? true
+        fastingArafah = defaults.object(forKey: Key.fastingArafah) as? Bool ?? true
         fastingRemindersEnabled = defaults.object(forKey: Key.fastingRemindersEnabled) as? Bool ?? true
         fastingReminderMode = defaults.string(forKey: Key.fastingReminderMode)
             .flatMap(FastingReminderMode.init(rawValue:)) ?? .afterMaghrib
@@ -528,6 +552,8 @@ final class AppSettings {
         static let fastingEnabled = "fastingEnabled"
         static let fastingMondayThursday = "fastingMondayThursday"
         static let fastingWhiteDays = "fastingWhiteDays"
+        static let fastingAshura = "fastingAshura"
+        static let fastingArafah = "fastingArafah"
         static let fastingRemindersEnabled = "fastingRemindersEnabled"
         static let fastingReminderMode = "fastingReminderMode"
         static let fastingReminderMinutesAfterMaghrib = "fastingReminderMinutesAfterMaghrib"

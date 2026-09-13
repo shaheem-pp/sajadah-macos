@@ -160,7 +160,7 @@ Widgets used to be listed here too. They now work on unsigned builds; see
 - Quran reader with all 114 surahs, Arabic interleaved with your choice of 17 English translations
 - Full-text translation search, bookmarks, resume-where-you-left-off, and a verse of the day
 - Friday reminder to read Surah Al-Kahf, plus an optional daily reading reminder
-- Sunnah fasting days — Mondays, Thursdays and the white days — marked beside the Hijri date, with a reminder the evening before. Off by default; never in Ramadan or on a day fasting is forbidden
+- Fasting days — Mondays, Thursdays, the white days, Ashura and Arafah — marked beside the Hijri date, with a reminder the evening before; in Ramadan the label is the time of iftar. Off by default; never on a day fasting is forbidden
 - Hijri dates from Aladhan's Umm al-Qura calendar as adjusted to Saudi Arabia's sighting announcements, with a ±2-day adjustment for communities that saw the moon on a different night
 - 17 calculation methods and both Asr conventions, changeable in Settings — a sidebar window in the shape System Settings uses
 - Works offline: timings are cached a month at a time on disk and keep displaying with an "Offline" badge if a refresh fails
@@ -358,20 +358,26 @@ for someone who prays every day and logs none of them: one click per skipped day
 
 ### Fasting
 
-Off by default, in Settings → Fasting. Two rules, each its own switch: Mondays and Thursdays,
-and the white days — the 13th, 14th and 15th of each Hijri month. Ramadan is skipped because
-everyone is already fasting, and the days fasting is forbidden win over any reason to: both
-Eids and the three days of Tashreeq after Eid al-Adha, which means 13 Dhū al-Ḥijjah is left out
-even though it is a white day. When a Monday falls on a white day there is one label and one
-notification naming both, not two.
+Off by default, in Settings → Fasting. Four rules, each its own switch: Mondays and Thursdays;
+the white days — the 13th, 14th and 15th of each Hijri month; Ashura, with the 9th of Muḥarram
+alongside the 10th; and the day of Arafah, 9 Dhū al-Ḥijjah. The days fasting is forbidden win
+over any reason to: both Eids and the three days of Tashreeq after Eid al-Adha, which means
+13 Dhū al-Ḥijjah is left out even though it is a white day. When a Monday falls on a white day
+there is one label and one notification naming both, not two.
+
+Ramadan has no switch — there is no choice to make about it — and is treated differently in
+both directions. The label beside the date is the time of iftar rather than "fasting day",
+since the date beside it already says which day of the month it is, and the only reminder is
+the one the evening before the 1st: a month of nightly "fasting tomorrow" is the notification
+nobody in Ramadan needs.
 
 The reminder lands the evening *before* the fast, because that is when a fast is decided on —
 after Maghrib by default, which is also when the Islamic day begins, or at a clock time of your
 choosing. It names the day and gives the time of Fajr, so suhoor can be planned. The reminders
 are one-shots in the same diffed batch as everything else rather than repeating weekday
-triggers: the white days move with the Hijri calendar, and a Monday in Ramadan must not fire.
-They are gated independently of the prayer-time notifications, for the same reason the Iqamah
-reminder is.
+triggers: the white days move with the Hijri calendar, and a Monday in Ramadan must not fire
+on its own. They are gated independently of the prayer-time notifications, for the same reason
+the Iqamah reminder is.
 
 The Hijri date all of this hangs off comes from Aladhan's `HJCoSA` calendar — Umm al-Qura,
 adjusted to Saudi Arabia's official sighting announcements — pinned explicitly rather than

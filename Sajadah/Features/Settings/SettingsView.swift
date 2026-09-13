@@ -348,15 +348,19 @@ private struct FastingSettingsView: View {
 
         Form {
             Section {
-                Toggle("Show sunnah fasting days", isOn: $settings.fastingEnabled)
+                Toggle("Show fasting days", isOn: $settings.fastingEnabled)
                 Toggle("Mondays and Thursdays", isOn: $settings.fastingMondayThursday)
                     .disabled(!settings.fastingEnabled)
                 Toggle("The white days — 13th, 14th and 15th", isOn: $settings.fastingWhiteDays)
                     .disabled(!settings.fastingEnabled)
+                Toggle("Ashura — 9th and 10th of Muḥarram", isOn: $settings.fastingAshura)
+                    .disabled(!settings.fastingEnabled)
+                Toggle("The day of Arafah — 9 Dhū al-Ḥijjah", isOn: $settings.fastingArafah)
+                    .disabled(!settings.fastingEnabled)
             } header: {
                 Text("Fasting days")
             } footer: {
-                Text("Marked beside the Hijri date in the popover, the window and the Today widget. Never in Ramadan, on either Eid, or the days of Tashreeq — 13 Dhū al-Ḥijjah is skipped even though it is a white day.")
+                Text("Marked beside the Hijri date in the popover, the window and the Today widget. Ramadan is always marked, with iftar beside the date and one reminder the evening before it begins. Never on either Eid or the days of Tashreeq — 13 Dhū al-Ḥijjah is skipped even though it is a white day.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

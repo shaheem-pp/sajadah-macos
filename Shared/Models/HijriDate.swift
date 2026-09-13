@@ -38,6 +38,15 @@ nonisolated struct HijriDate: Codable, Sendable, Equatable, Hashable {
 
     var isRamadan: Bool { month == 9 }
 
+    /// 9 Muḥarram — the day the Prophet ﷺ meant to fast alongside Ashura.
+    var isTasua: Bool { month == 1 && day == 9 }
+
+    /// 10 Muḥarram.
+    var isAshura: Bool { month == 1 && day == 10 }
+
+    /// 9 Dhū al-Ḥijjah — the day of standing at Arafah, and a fast for everyone not there.
+    var isArafah: Bool { month == 12 && day == 9 }
+
     /// Eid al-Fitr, Eid al-Adha and the three days of Tashreeq after it. Fasting on these is
     /// forbidden, which outranks any reason to — 13 Dhū al-Ḥijjah is a white day nobody fasts.
     var isFastingForbidden: Bool {

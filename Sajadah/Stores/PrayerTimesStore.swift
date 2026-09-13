@@ -147,31 +147,63 @@ final class PrayerTimesStore {
     /// existed, so the line never goes blank while the one-time refetch is in flight.
     var hijriDateText: String? { displayedHijriDate?.formatted ?? today?.hijri }
 
-    /// "Fasting day · Monday", or nil. Lives beside the Hijri date it is derived from.
+    /// "Fasting day · Monday", "Iftar 7:32 PM", or nil. Lives beside the Hijri date it is
+    /// derived from, and is worded here rather than in the calendar because one case carries
+    /// a clock time, which only the app knows how the user wants written.
     var fastingIndicator: String? {
         guard let settings else { return nil }
-        return days.fastingIndicator(
+        let indicator = days.fastingIndicator(
             at: now,
             hijri: settings.hijriPreferences,
             fasting: settings.fastingPreferences,
-            timeZone: displayTimeZone,
-            compact: false
+            timeZone: displayTimeZone
         )
+        return switch indicator {
+        case .fastingToday(let reasons): "Fasting day · \(reasons.joined)"
+        case .fastingTomorrow(let reasons): "Fasting tomorrow · \(reasons.joined)"
+        case .iftar(let maghrib):
+            "Iftar \(TimeFormatting.clock(maghrib, use24Hour: settings.use24HourClock, timeZone: displayTimeZone))"
+        case .ramadanTomorrow: "Ramadan tomorrow"
+        case nil: nil
+        }
+    }
+
+    /// The civil day `dayKey`'s fasting status, on the adjusted Hijri date. Nil with fasting off.
+    func fastingStatus(on dayKey: String) -> FastingDayStatus? {
+        guard let settings else { return nil }
+        return days.fastingStatus(
+            on: dayKey,
+            hijri: settings.hijriPreferences,
+            fasting: settings.fastingPreferences,
+            timeZone: displayTimeZone
+        )
+    }
+
+    /// Fasting days from today through `limitDays` ahead, for listing rather than reminding.
+    /// Runs past the cached days: the weekday needs no timings and the Hijri date falls back
+    /// to arithmetic, so the list is the same length whichever month the cache ends in.
+    func fastingDays(withinDays limitDays: Int) -> [FastingDayStatus] {
+        let todayKey = todayKey
+        return (0...limitDays).compactMap { offset in
+            guard let key = DayKey.shifted(todayKey, by: offset),
+                  let status = fastingStatus(on: key), status.isFast else { return nil }
+            return status
+        }
     }
 
     /// Fasting days within `limitDays` of today whose reminder could still fire. Starts at
     /// today rather than tomorrow: today's evening-before has passed, but a fixed reminder
-    /// time after midnight hasn't necessarily, and the scheduler drops what's spent.
+    /// time after midnight hasn't necessarily, and the scheduler drops what's spent. A day
+    /// whose reasons don't want an eve reminder — every Ramadan day but the first — is left out.
     func upcomingFastingDays(limitDays: Int) -> [FastingDay] {
         guard let settings, settings.fastingEnabled else { return [] }
         let todayKey = todayKey
         return (0...limitDays).compactMap { offset in
             guard let key = DayKey.shifted(todayKey, by: offset), let day = days[key],
                   let eveKey = DayKey.previous(key), let eve = days[eveKey],
-                  let hijri = hijriDate(for: key) else { return nil }
-            let reasons = FastingCalendar.reasons(for: day, hijri: hijri, preferences: settings.fastingPreferences)
-            guard !reasons.isEmpty else { return nil }
-            return FastingDay(dayKey: key, hijri: hijri, reasons: reasons, fajr: day.fajr, eve: eve)
+                  let status = fastingStatus(on: key),
+                  status.reasons.contains(where: { $0.remindsOnEve(of: status.hijri) }) else { return nil }
+            return FastingDay(dayKey: key, hijri: status.hijri, reasons: status.reasons, fajr: day.fajr, eve: eve)
         }
     }
 

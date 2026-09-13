@@ -446,7 +446,7 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
 
     private static func fastingRequest(_ day: FastingDay, fireDate: Date) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
-        content.title = "Fasting tomorrow"
+        content.title = day.reasons.contains(.ramadan) ? "Ramadan begins tomorrow" : "Fasting tomorrow"
         let fajr = day.fajr.formatted(date: .omitted, time: .shortened)
         content.body = "\(fastingSentence(for: day)) Fajr is at \(fajr)."
         content.sound = .default
@@ -461,21 +461,36 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
     /// Reads correctly whether the displayed date has already turned over at Maghrib or
     /// won't until midnight, because it names the civil day and the fast only.
     private static func fastingSentence(for day: FastingDay) -> String {
-        let weekday = day.reasons.first { $0 != .whiteDay }?.displayName
-        let isWhiteDay = day.reasons.contains(.whiteDay)
+        let weekday = day.reasons.first(where: \.isWeekday)?.displayName
+        let dated = datedPhrase(for: day)
 
-        switch (weekday, isWhiteDay) {
-        case (let weekday?, true):
-            return "Tomorrow is \(weekday) and \(day.hijri.dayAndMonth) — a sunnah fasting day and one of the white days."
-        case (let weekday?, false):
+        switch (weekday, dated) {
+        case (let weekday?, let dated?):
+            return "Tomorrow is \(weekday) and \(dated)."
+        case (let weekday?, nil):
             return "Tomorrow is \(weekday), a sunnah fasting day."
-        case (nil, _):
+        case (nil, let dated?):
             // "First of the three" only when it is: in Dhū al-Ḥijjah the 13th is skipped, and
             // calling the 14th "second" would then be wrong.
-            return day.hijri.day == 13
-                ? "The white days begin tomorrow — \(day.hijri.dayAndMonth)."
-                : "Tomorrow is \(day.hijri.dayAndMonth), one of the three white days."
+            if day.reasons == [.whiteDay], day.hijri.day == 13 {
+                return "The white days begin tomorrow — \(day.hijri.dayAndMonth)."
+            }
+            return "Tomorrow is \(dated)."
+        case (nil, nil):
+            return "Tomorrow is a sunnah fasting day."
         }
+    }
+
+    /// The part of the sentence that names a Hijri date, for the reasons that come from one.
+    /// At most one applies on any day — a white day is never the 9th or 10th of anything.
+    private static func datedPhrase(for day: FastingDay) -> String? {
+        let date = day.hijri.dayAndMonth
+        if day.reasons.contains(.ramadan) { return date }
+        if day.reasons.contains(.tasua) { return "\(date), the day before Ashura — fasted alongside the 10th" }
+        if day.reasons.contains(.ashura) { return "Ashura, \(date)" }
+        if day.reasons.contains(.arafah) { return "the day of Arafah, \(date)" }
+        if day.reasons.contains(.whiteDay) { return "\(date), one of the three white days" }
+        return nil
     }
 
     private enum Stage { case soft, final }
