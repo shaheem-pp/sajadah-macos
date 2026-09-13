@@ -53,6 +53,12 @@ final class AppCoordinator {
         settings.onCalculationChanged = { [store] in
             store.invalidateAndRefresh()
         }
+        settings.onAdhanAdjustmentsChanged = { [store, iqamah, settings] in
+            store.adhanAdjustmentsChanged()
+            // Iqamah computed as minutes after Adhan has to follow the Adhan; a masjid's own
+            // posted times don't, so the scrape is left alone.
+            if settings.iqamahSourceMode == .offset { iqamah.refresh() }
+        }
         settings.onNotificationPreferencesChanged = { [weak self] in
             self?.rescheduleNotifications()
         }

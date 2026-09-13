@@ -21,6 +21,7 @@ nonisolated enum SettingsPane: String, CaseIterable, Identifiable, Sendable {
     case quran
     case location
     case masjid
+    case advanced
 
     var id: String { rawValue }
 }

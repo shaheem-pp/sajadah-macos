@@ -21,6 +21,8 @@ nonisolated struct PrayerCacheFile: Codable, Sendable {
     /// written before it existed still decodes.
     var hijri: HijriPreferences?
     var fasting: FastingPreferences?
+    /// `days` are the API's own times; these are applied on the way out, by app and widget alike.
+    var adjustments: PrayerAdjustments?
 }
 
 nonisolated struct DailyAyahCache: Codable, Sendable {
@@ -112,7 +114,8 @@ nonisolated struct SajadahSnapshot: Sendable {
         var snapshot = SajadahSnapshot()
 
         if let cache: PrayerCacheFile = decode(CacheFileName.prayerTimes, isoDates: true) {
-            snapshot.days = cache.days
+            // The same arithmetic the app does, so a widget never shows a different minute.
+            snapshot.days = cache.days.adjusted(by: cache.adjustments ?? PrayerAdjustments())
             snapshot.placeName = cache.placeName
             snapshot.hijri = cache.hijri ?? HijriPreferences()
             snapshot.fasting = cache.fasting ?? FastingPreferences()

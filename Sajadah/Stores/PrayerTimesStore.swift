@@ -71,6 +71,8 @@ final class PrayerTimesStore {
     /// store, once a tick, for a value no view reads.
     @ObservationIgnored private(set) var menuBarTarget: Date?
 
+    /// The timings every reader uses, with the user's Adhan adjustments applied. Derived from
+    /// `rawDays` in `rebuildEvents()`; nothing writes to it directly.
     private(set) var days: [String: DayTimings] = [:]
 
     /// Fires whenever the set of known future prayers changes, so notifications can be rescheduled.
@@ -78,6 +80,9 @@ final class PrayerTimesStore {
 
     // MARK: Private state
 
+    /// The timings as the API computed them — what the cache holds. Adjustments are applied on
+    /// the way out rather than baked in, so changing them is arithmetic, not a refetch.
+    @ObservationIgnored private var rawDays: [String: DayTimings] = [:]
     @ObservationIgnored private var fetchedMonths: Set<String> = []
     @ObservationIgnored private var sortedEvents: [PrayerEvent] = []
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
@@ -111,17 +116,28 @@ final class PrayerTimesStore {
 
         // Timings computed with a different method are simply wrong now — drop them.
         if cachedMethod != settings.calculationMethod || cachedSchool != settings.asrSchool.rawValue {
-            days = [:]
+            rawDays = [:]
             fetchedMonths = []
-            rebuildEvents()
         }
+        // Unconditionally: `init` derived `days` before there were settings to adjust by.
+        rebuildEvents()
+    }
+
+    /// Re-derives every reader's timings from the cached ones. The cache is rewritten so the
+    /// widget sees the same adjustment, and `onEventsChanged` moves the notifications.
+    func adhanAdjustmentsChanged() {
+        rebuildEvents()
+        if !rawDays.isEmpty { persist(method: cachedMethod, school: cachedSchool) }
+        onEventsChanged?()
     }
 
     // MARK: Derived values
 
     var displayTimeZone: TimeZone {
-        days[todayKeyInCurrentZone]?.timeZone
-            ?? days.values.max { $0.dayKey < $1.dayKey }?.timeZone
+        // Off the raw cache: `loadCache` asks before the first `rebuildEvents` has derived
+        // `days`, and an adjustment never changes a day's zone anyway.
+        rawDays[todayKeyInCurrentZone]?.timeZone
+            ?? rawDays.values.max { $0.dayKey < $1.dayKey }?.timeZone
             ?? .current
     }
 
@@ -390,7 +406,7 @@ final class PrayerTimesStore {
         } ?? .greatestFiniteMagnitude
 
         if moved > Self.significantMoveMetres {
-            days = [:]
+            rawDays = [:]
             fetchedMonths = []
             placeName = nil
             rebuildEvents()
@@ -412,7 +428,7 @@ final class PrayerTimesStore {
             guard let self else { return }
 
             if force {
-                days = [:]
+                rawDays = [:]
                 fetchedMonths = []
                 rebuildEvents()
             }
@@ -425,7 +441,7 @@ final class PrayerTimesStore {
                 return
             }
 
-            if days.isEmpty { loadState = .loading }
+            if rawDays.isEmpty { loadState = .loading }
 
             let method = settings?.calculationMethod ?? CalculationMethod.defaultID
             let school = settings?.asrSchool.rawValue ?? AsrSchool.standard.rawValue
@@ -446,7 +462,7 @@ final class PrayerTimesStore {
                         school: school
                     )
                     guard !Task.isCancelled else { return }
-                    for day in result { days[day.dayKey] = day }
+                    for day in result { rawDays[day.dayKey] = day }
                     fetchedMonths.insert(key)
                     fetchedAny = true
                 } catch {
@@ -466,8 +482,8 @@ final class PrayerTimesStore {
             if let failure {
                 // Keep showing whatever we have; a menubar that goes blank when the wifi
                 // drops is worse than one that admits it is out of date.
-                isStale = !days.isEmpty
-                loadState = days.isEmpty ? .failed(failure) : .loaded
+                isStale = !rawDays.isEmpty
+                loadState = rawDays.isEmpty ? .failed(failure) : .loaded
             } else {
                 isStale = false
                 loadState = .loaded
@@ -493,6 +509,7 @@ final class PrayerTimesStore {
     }
 
     private func rebuildEvents() {
+        days = rawDays.adjusted(by: settings?.adhanAdjustments ?? PrayerAdjustments())
         sortedEvents = days.values.flatMap(\.events).sorted { $0.date < $1.date }
         menuBar = makeMenuBarContent(at: now, iqamah: lastIqamah)
     }
@@ -502,7 +519,7 @@ final class PrayerTimesStore {
         // the day before yesterday's entry, and a pruned entry means a computed fallback that
         // may not match the API's.
         let cutoff = DayKey.make(for: now.addingTimeInterval(-3 * 86_400), in: displayTimeZone)
-        days = days.filter { $0.key >= cutoff }
+        rawDays = rawDays.filter { $0.key >= cutoff }
         // A month whose days were partly pruned must not look fully cached any more.
         fetchedMonths = fetchedMonths.filter { $0 >= String(cutoff.prefix(7)) }
     }
@@ -566,7 +583,7 @@ final class PrayerTimesStore {
         decoder.dateDecodingStrategy = .iso8601
         guard let cache = try? decoder.decode(PrayerCacheFile.self, from: data) else { return }
 
-        days = cache.days
+        rawDays = cache.days
         fetchedMonths = Set(cache.fetchedMonths)
         placeName = cache.placeName
         // A cache from before the structured Hijri date existed has the string and nothing
@@ -574,7 +591,7 @@ final class PrayerTimesStore {
         // once — and overwrite each day in place. Only days from today on count: a refresh
         // never refetches last month, so a leftover from it would trip this every launch.
         let today = DayKey.make(for: now, in: displayTimeZone)
-        if days.contains(where: { $0.key >= today && $0.value.hijriDate == nil }) {
+        if rawDays.contains(where: { $0.key >= today && $0.value.hijriDate == nil }) {
             fetchedMonths = []
         }
         cachedMethod = cache.method
@@ -590,7 +607,7 @@ final class PrayerTimesStore {
     /// reads its copy of this file, not defaults, so a preference has to be written here to
     /// reach it at all.
     func syncPreferencesToCache() {
-        guard !days.isEmpty else { return }
+        guard !rawDays.isEmpty else { return }
         persist(method: cachedMethod, school: cachedSchool)
     }
 
@@ -599,7 +616,7 @@ final class PrayerTimesStore {
         cachedSchool = school
 
         let cache = PrayerCacheFile(
-            days: days,
+            days: rawDays,
             fetchedMonths: Array(fetchedMonths),
             latitude: coordinate?.latitude,
             longitude: coordinate?.longitude,
@@ -607,7 +624,8 @@ final class PrayerTimesStore {
             method: method,
             school: school,
             hijri: settings?.hijriPreferences,
-            fasting: settings?.fastingPreferences
+            fasting: settings?.fastingPreferences,
+            adjustments: settings?.adhanAdjustments
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

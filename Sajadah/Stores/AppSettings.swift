@@ -31,6 +31,79 @@ final class AppSettings {
         }
     }
 
+    // MARK: Adhan adjustments
+
+    /// Off by default. The five offsets below survive the switch being turned off, so it can
+    /// be flipped to compare against the computed times and flipped back.
+    var adhanAdjustmentsEnabled: Bool {
+        didSet {
+            guard adhanAdjustmentsEnabled != oldValue else { return }
+            defaults.set(adhanAdjustmentsEnabled, forKey: Key.adhanAdjustmentsEnabled)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    /// Minutes added to each computed Adhan. Negative moves it earlier.
+    var adhanAdjustmentFajr: Int {
+        didSet {
+            guard adhanAdjustmentFajr != oldValue else { return }
+            defaults.set(adhanAdjustmentFajr, forKey: Key.adhanAdjustmentFajr)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    var adhanAdjustmentDhuhr: Int {
+        didSet {
+            guard adhanAdjustmentDhuhr != oldValue else { return }
+            defaults.set(adhanAdjustmentDhuhr, forKey: Key.adhanAdjustmentDhuhr)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    var adhanAdjustmentAsr: Int {
+        didSet {
+            guard adhanAdjustmentAsr != oldValue else { return }
+            defaults.set(adhanAdjustmentAsr, forKey: Key.adhanAdjustmentAsr)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    var adhanAdjustmentMaghrib: Int {
+        didSet {
+            guard adhanAdjustmentMaghrib != oldValue else { return }
+            defaults.set(adhanAdjustmentMaghrib, forKey: Key.adhanAdjustmentMaghrib)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    var adhanAdjustmentIsha: Int {
+        didSet {
+            guard adhanAdjustmentIsha != oldValue else { return }
+            defaults.set(adhanAdjustmentIsha, forKey: Key.adhanAdjustmentIsha)
+            onAdhanAdjustmentsChanged?()
+        }
+    }
+
+    var adhanAdjustments: PrayerAdjustments {
+        PrayerAdjustments(
+            enabled: adhanAdjustmentsEnabled,
+            fajr: adhanAdjustmentFajr,
+            dhuhr: adhanAdjustmentDhuhr,
+            asr: adhanAdjustmentAsr,
+            maghrib: adhanAdjustmentMaghrib,
+            isha: adhanAdjustmentIsha
+        )
+    }
+
+    /// Back to the computed times, with the switch left as it is.
+    func resetAdhanAdjustments() {
+        adhanAdjustmentFajr = 0
+        adhanAdjustmentDhuhr = 0
+        adhanAdjustmentAsr = 0
+        adhanAdjustmentMaghrib = 0
+        adhanAdjustmentIsha = 0
+    }
+
     // MARK: Notifications
 
     var notificationsEnabled: Bool {
@@ -418,6 +491,9 @@ final class AppSettings {
 
     /// Called when a change invalidates cached timings (method or Asr school).
     var onCalculationChanged: (() -> Void)?
+    /// Called when the Adhan adjustments change. The cached timings stay valid — they are
+    /// re-read through the new offsets, not refetched.
+    var onAdhanAdjustmentsChanged: (() -> Void)?
     /// Called when a change invalidates cached Quran text (translation edition).
     var onTranslationChanged: (() -> Void)?
     /// Called when the set of notifications that should be pending changes.
@@ -441,6 +517,12 @@ final class AppSettings {
         calculationMethod = defaults.object(forKey: Key.calculationMethod) as? Int
             ?? CalculationMethod.defaultID
         asrSchool = AsrSchool(rawValue: defaults.integer(forKey: Key.asrSchool)) ?? .standard
+        adhanAdjustmentsEnabled = defaults.object(forKey: Key.adhanAdjustmentsEnabled) as? Bool ?? false
+        adhanAdjustmentFajr = defaults.object(forKey: Key.adhanAdjustmentFajr) as? Int ?? 0
+        adhanAdjustmentDhuhr = defaults.object(forKey: Key.adhanAdjustmentDhuhr) as? Int ?? 0
+        adhanAdjustmentAsr = defaults.object(forKey: Key.adhanAdjustmentAsr) as? Int ?? 0
+        adhanAdjustmentMaghrib = defaults.object(forKey: Key.adhanAdjustmentMaghrib) as? Int ?? 0
+        adhanAdjustmentIsha = defaults.object(forKey: Key.adhanAdjustmentIsha) as? Int ?? 0
         notificationsEnabled = defaults.object(forKey: Key.notificationsEnabled) as? Bool ?? true
         enabledPrayers = (defaults.array(forKey: Key.enabledPrayers) as? [String])
             .map { Set($0.compactMap(Prayer.init(rawValue:))) }
@@ -531,6 +613,12 @@ final class AppSettings {
     private enum Key {
         static let calculationMethod = "calculationMethod"
         static let asrSchool = "asrSchool"
+        static let adhanAdjustmentsEnabled = "adhanAdjustmentsEnabled"
+        static let adhanAdjustmentFajr = "adhanAdjustmentFajr"
+        static let adhanAdjustmentDhuhr = "adhanAdjustmentDhuhr"
+        static let adhanAdjustmentAsr = "adhanAdjustmentAsr"
+        static let adhanAdjustmentMaghrib = "adhanAdjustmentMaghrib"
+        static let adhanAdjustmentIsha = "adhanAdjustmentIsha"
         static let notificationsEnabled = "notificationsEnabled"
         static let enabledPrayers = "enabledPrayers"
         static let reminderOffsetMinutes = "reminderOffsetMinutes"
