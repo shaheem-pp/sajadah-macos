@@ -150,12 +150,14 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
     /// - Parameters:
     ///   - prayers: Every prayer still worth scheduling something for, nearest first.
     ///   - checkIns: Window closes, which the final "last chance" ask hangs off.
+    ///   - fastingDays: Sunnah fasting days ahead, each with the evening before it.
     ///   - answered: Ids (`PrayerCheckIn.id` / `UpcomingPrayer.id`) already logged — asking
     ///     again about a prayer the user has answered is the fastest way to get muted.
     ///   - surah: The surah a Quran reminder should open.
     func reschedule(
         prayers: [UpcomingPrayer],
         checkIns: [PrayerCheckIn],
+        fastingDays: [FastingDay],
         answered: Set<String>,
         settings: AppSettings,
         placeName: String?,
@@ -168,6 +170,7 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
             await rebuild(
                 prayers: prayers,
                 checkIns: checkIns,
+                fastingDays: fastingDays,
                 answered: answered,
                 settings: settings,
                 placeName: placeName,
@@ -181,6 +184,7 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
     private func rebuild(
         prayers: [UpcomingPrayer],
         checkIns: [PrayerCheckIn],
+        fastingDays: [FastingDay],
         answered: Set<String>,
         settings: AppSettings,
         placeName: String?,
@@ -235,6 +239,22 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
                     fireDate: fireDate,
                     leadMinutes: settings.iqamahReminderOffsetMinutes
                 )))
+            }
+        }
+
+        // Also independent of `notificationsEnabled`, for the same reason as Iqamah. One-shots
+        // rather than repeating weekday triggers: the white days move with the Hijri calendar,
+        // and a Monday in Ramadan or on Eid must not fire at all.
+        if settings.fastingEnabled && settings.fastingRemindersEnabled {
+            for day in fastingDays {
+                let fireDate: Date? = switch settings.fastingReminderMode {
+                case .afterMaghrib:
+                    day.eve.maghrib.addingTimeInterval(TimeInterval(settings.fastingReminderMinutesAfterMaghrib * 60))
+                case .fixedTime:
+                    day.eve.localTime(minutesFromMidnight: settings.fastingReminderMinutes)
+                }
+                guard let fireDate, fireDate > now else { continue }
+                candidates.append((fireDate, Self.fastingRequest(day, fireDate: fireDate)))
             }
         }
 
@@ -422,6 +442,40 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
             content: content,
             fireDate: fireDate
         )
+    }
+
+    private static func fastingRequest(_ day: FastingDay, fireDate: Date) -> UNNotificationRequest {
+        let content = UNMutableNotificationContent()
+        content.title = "Fasting tomorrow"
+        let fajr = day.fajr.formatted(date: .omitted, time: .shortened)
+        content.body = "\(fastingSentence(for: day)) Fajr is at \(fajr)."
+        content.sound = .default
+
+        return request(
+            identifier: "fast-\(day.dayKey)",
+            content: content,
+            fireDate: fireDate
+        )
+    }
+
+    /// Reads correctly whether the displayed date has already turned over at Maghrib or
+    /// won't until midnight, because it names the civil day and the fast only.
+    private static func fastingSentence(for day: FastingDay) -> String {
+        let weekday = day.reasons.first { $0 != .whiteDay }?.displayName
+        let isWhiteDay = day.reasons.contains(.whiteDay)
+
+        switch (weekday, isWhiteDay) {
+        case (let weekday?, true):
+            return "Tomorrow is \(weekday) and \(day.hijri.dayAndMonth) — a sunnah fasting day and one of the white days."
+        case (let weekday?, false):
+            return "Tomorrow is \(weekday), a sunnah fasting day."
+        case (nil, _):
+            // "First of the three" only when it is: in Dhū al-Ḥijjah the 13th is skipped, and
+            // calling the 14th "second" would then be wrong.
+            return day.hijri.day == 13
+                ? "The white days begin tomorrow — \(day.hijri.dayAndMonth)."
+                : "Tomorrow is \(day.hijri.dayAndMonth), one of the three white days."
+        }
     }
 
     private enum Stage { case soft, final }

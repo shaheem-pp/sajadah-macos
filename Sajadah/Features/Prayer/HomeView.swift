@@ -37,6 +37,9 @@ struct HomeView: View {
                 }
 
                 streak
+                if !settings.fastingEnabled && !settings.fastingInviteDismissed {
+                    fastingInvite
+                }
                 weekAhead
             }
             .padding(22)
@@ -60,6 +63,7 @@ struct HomeView: View {
             timeZone: store.displayTimeZone,
             place: store.placeName ?? "Current location",
             hijri: store.hijriDateText,
+            fasting: store.fastingIndicator,
             isStale: store.isStale
         ) {
             panel
@@ -226,6 +230,41 @@ struct HomeView: View {
         guard dayKey == store.todayKey else { return Set(DayLog.tracked) }
         guard let today = store.today else { return [] }
         return Set(DayLog.tracked.filter { today.time(for: $0) < store.now })
+    }
+
+    /// Off by default, so it has to say it exists — once, and where the label it adds would
+    /// appear. No first-launch wizard: a menubar app's first job is the next prayer, now.
+    private var fastingInvite: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "fork.knife")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.jade)
+
+            Text("Mark Mondays, Thursdays and the white days beside the Hijri date, with a reminder the evening before.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 8)
+
+            Button("Turn On…") {
+                navigation.settingsPane = .fasting
+                openSettings()
+            }
+            .controlSize(.small)
+
+            Button {
+                settings.fastingInviteDismissed = true
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Hide this")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .sajadahCard(padding: 0)
     }
 
     // MARK: Week ahead

@@ -172,14 +172,17 @@ extension DayTimings {
     }
 
     private func ishaCutoff(minutesFromMidnight: Int) -> Date? {
+        guard let cutoff = localTime(minutesFromMidnight: minutesFromMidnight) else { return nil }
+        // At high latitudes Isha can fall after the cutoff, leaving nothing sensible to ask.
+        return cutoff > isha ? cutoff : nil
+    }
+
+    /// A clock time on this day, in its own timezone.
+    func localTime(minutesFromMidnight: Int) -> Date? {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         // Anchored on Dhuhr because midday is unambiguously inside the right local day.
         let midnight = calendar.startOfDay(for: dhuhr)
-        guard let cutoff = calendar.date(byAdding: .minute, value: minutesFromMidnight, to: midnight) else {
-            return nil
-        }
-        // At high latitudes Isha can fall after the cutoff, leaving nothing sensible to ask.
-        return cutoff > isha ? cutoff : nil
+        return calendar.date(byAdding: .minute, value: minutesFromMidnight, to: midnight)
     }
 }

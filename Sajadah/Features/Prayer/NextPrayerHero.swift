@@ -25,6 +25,8 @@ struct NextPrayerHero: View {
     let clock: String
     var place: String?
     var hijri: String?
+    /// "Fasting day · Monday" — sits beside the Hijri date it is derived from.
+    var fasting: String?
     var isStale: Bool = false
     /// How far the current window has run, 0...1. Nil when there is nothing to measure from.
     var progress: Double?
@@ -34,6 +36,9 @@ struct NextPrayerHero: View {
     /// the only moment in the day where being late is a different outcome rather than a
     /// later one.
     var isUrgent: Bool = false
+
+    @Environment(AppNavigation.self) private var navigation
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -135,7 +140,7 @@ struct NextPrayerHero: View {
                 windowBar(progress)
             }
 
-            if place != nil || hijri != nil {
+            if place != nil || hijri != nil || fasting != nil {
                 footer
             }
         }
@@ -167,17 +172,41 @@ struct NextPrayerHero: View {
                     .font(.system(size: compact ? 8 : 9))
                 Text(place)
             }
-            if place != nil && hijri != nil {
-                Text("·").foregroundStyle(.white.opacity(0.4))
+            if place != nil && (hijri != nil || fasting != nil) {
+                separator
             }
-            if let hijri {
-                Text(hijri)
+            // The date is the thing you'd want to adjust, so it is also the way to where that
+            // happens — there is no other cue in the app that it can be.
+            Button {
+                navigation.settingsPane = .fasting
+                openSettings()
+            } label: {
+                HStack(spacing: 5) {
+                    if let hijri {
+                        Text(hijri)
+                    }
+                    if hijri != nil && fasting != nil {
+                        separator
+                    }
+                    if let fasting {
+                        Text(fasting)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Theme.brassOnSky)
+                    }
+                }
             }
+            .buttonStyle(.plain)
+            .pointerStyle(.link)
+            .help("Adjust the Hijri date and fasting days")
         }
         .font(.system(size: compact ? 10.5 : 12))
         .foregroundStyle(.white.opacity(0.85))
         .lineLimit(1)
         .padding(.top, compact ? 1 : 3)
+    }
+
+    private var separator: some View {
+        Text("·").foregroundStyle(.white.opacity(0.4))
     }
 }
 
@@ -200,6 +229,7 @@ extension NextPrayerHero {
         timeZone: TimeZone,
         place: String?,
         hijri: String?,
+        fasting: String? = nil,
         isStale: Bool = false,
         compact: Bool = false
     ) {
@@ -262,6 +292,7 @@ extension NextPrayerHero {
 
         self.place = place
         self.hijri = hijri
+        self.fasting = fasting
         self.isStale = isStale
         self.compact = compact
     }

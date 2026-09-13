@@ -151,16 +151,18 @@ Widgets used to be listed here too. They now work on unsigned builds; see
 ## Features
 
 - Menubar countdown to the next prayer, redrawn only when the text actually changes — and only woken once a minute unless a seconds countdown is on screen
-- Popover with today's six timings, the current place, and the Hijri date
+- Popover with today's six timings, the current place, and the Hijri date — which turns over at Maghrib, when the Islamic day begins, or at midnight if you'd rather match a printed calendar
 - Full window with today plus the next 7 days
 - Local notifications at prayer time, with per-prayer toggles and an optional "N minutes before" offset
 - Iqamah reminders a configurable number of minutes before your masjid's congregation time
 - Two-stage check-ins that ask whether you prayed — shortly after the Adhan, and once more as the window closes — with Yes/No buttons right on the notification
-- Prayer log with daily streaks, a best-streak record, and a 30-day history grid
+- Prayer log with daily streaks, a best-streak record, and a 30-day history grid — click any square to log or correct a past day
 - Quran reader with all 114 surahs, Arabic interleaved with your choice of 17 English translations
 - Full-text translation search, bookmarks, resume-where-you-left-off, and a verse of the day
 - Friday reminder to read Surah Al-Kahf, plus an optional daily reading reminder
-- 17 calculation methods and both Asr conventions, changeable in Settings
+- Sunnah fasting days — Mondays, Thursdays and the white days — marked beside the Hijri date, with a reminder the evening before. Off by default; never in Ramadan or on a day fasting is forbidden
+- Hijri dates from Aladhan's Umm al-Qura calendar as adjusted to Saudi Arabia's sighting announcements, with a ±2-day adjustment for communities that saw the moon on a different night
+- 17 calculation methods and both Asr conventions, changeable in Settings — a sidebar window in the shape System Settings uses
 - Works offline: timings are cached a month at a time on disk and keep displaying with an "Offline" badge if a refresh fails
 - Refreshes on wake, on day rollover, on clock changes, and when you move more than 5 km
 - Optional launch at login
@@ -350,7 +352,39 @@ when the window actually closes, the question comes back as a final ask, and **N
 it missed. Answering at either stage retires the other, because the batch is rebuilt from
 scratch and skips anything already answered.
 
-Anything you miss can still be logged by clicking the circle beside a prayer in the popover.
+Anything you miss can still be logged by clicking the circle beside a prayer in the popover,
+and any past day by clicking its square in the window's 30-day grid — which is the whole answer
+for someone who prays every day and logs none of them: one click per skipped day, not five.
+
+### Fasting
+
+Off by default, in Settings → Fasting. Two rules, each its own switch: Mondays and Thursdays,
+and the white days — the 13th, 14th and 15th of each Hijri month. Ramadan is skipped because
+everyone is already fasting, and the days fasting is forbidden win over any reason to: both
+Eids and the three days of Tashreeq after Eid al-Adha, which means 13 Dhū al-Ḥijjah is left out
+even though it is a white day. When a Monday falls on a white day there is one label and one
+notification naming both, not two.
+
+The reminder lands the evening *before* the fast, because that is when a fast is decided on —
+after Maghrib by default, which is also when the Islamic day begins, or at a clock time of your
+choosing. It names the day and gives the time of Fajr, so suhoor can be planned. The reminders
+are one-shots in the same diffed batch as everything else rather than repeating weekday
+triggers: the white days move with the Hijri calendar, and a Monday in Ramadan must not fire.
+They are gated independently of the prayer-time notifications, for the same reason the Iqamah
+reminder is.
+
+The Hijri date all of this hangs off comes from Aladhan's `HJCoSA` calendar — Umm al-Qura,
+adjusted to Saudi Arabia's official sighting announcements — pinned explicitly rather than
+inherited as the API's default, because the offline fallback (Foundation's own Umm al-Qura
+calendar, used only for a day the cache doesn't hold) is chosen to agree with it. A community
+that sighted the moon a night earlier or later is a day off from that, and nothing on the Mac
+can tell which, so Settings → Fasting has a ±2-day adjustment: set +1 if your masjid began the
+month a day earlier. The adjusted date for a day is simply the unadjusted date of the
+neighbouring one, which keeps month lengths right without any Hijri arithmetic of our own, and
+the popover, the window, the widget and the fasting days all follow it. By default the displayed
+date turns over at Maghrib, when the Islamic day begins; a switch makes it change at midnight
+instead for anyone checking against a printed calendar at 9pm. The date in the popover is
+clickable and leads to these settings, since the date is the thing you'd want to adjust.
 
 ### Design
 

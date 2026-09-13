@@ -157,10 +157,19 @@ struct PrayerTimesView: View {
                     Text(entry.snapshot.placeName ?? "Today")
                         .font(.caption).fontWeight(.medium)
                     Spacer(minLength: 6)
-                    Text(entry.snapshot.displayedHijriDate(at: entry.date)?.formatted ?? day.hijri)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    HStack(spacing: 4) {
+                        if let fasting = entry.snapshot.fastingIndicator(at: entry.date) {
+                            Text(fasting)
+                                .fontWeight(.medium)
+                                .foregroundStyle(Theme.brass)
+                            Text("·").foregroundStyle(.quaternary)
+                        }
+                        Text(entry.snapshot.displayedHijriDate(at: entry.date)?.formatted ?? day.hijri)
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 }
                 .padding(.bottom, 1)
 

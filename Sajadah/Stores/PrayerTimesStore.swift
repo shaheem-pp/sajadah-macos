@@ -20,6 +20,19 @@ nonisolated struct UpcomingPrayer: Identifiable, Sendable, Equatable {
     var id: String { "\(dayKey)-\(prayer.rawValue)" }
 }
 
+/// A voluntary fasting day with what a reminder about it needs: why it is one, when Fajr is,
+/// and the evening before it — which is where the reminder belongs, since a fast is decided
+/// on the night before. As with Iqamah, *when* to fire is the scheduler's call.
+nonisolated struct FastingDay: Identifiable, Sendable, Equatable {
+    let dayKey: String
+    let hijri: HijriDate
+    let reasons: [FastingReason]
+    let fajr: Date
+    let eve: DayTimings
+
+    var id: String { dayKey }
+}
+
 /// Owns prayer timings: fetching them, caching them to disk, and answering "what's next?".
 ///
 /// Timings are cached a whole month at a time and always kept covering at least the next
@@ -133,6 +146,34 @@ final class PrayerTimesStore {
     /// Falls back to the API's own string for a cache written before the structured date
     /// existed, so the line never goes blank while the one-time refetch is in flight.
     var hijriDateText: String? { displayedHijriDate?.formatted ?? today?.hijri }
+
+    /// "Fasting day · Monday", or nil. Lives beside the Hijri date it is derived from.
+    var fastingIndicator: String? {
+        guard let settings else { return nil }
+        return days.fastingIndicator(
+            at: now,
+            hijri: settings.hijriPreferences,
+            fasting: settings.fastingPreferences,
+            timeZone: displayTimeZone,
+            compact: false
+        )
+    }
+
+    /// Fasting days within `limitDays` of today whose reminder could still fire. Starts at
+    /// today rather than tomorrow: today's evening-before has passed, but a fixed reminder
+    /// time after midnight hasn't necessarily, and the scheduler drops what's spent.
+    func upcomingFastingDays(limitDays: Int) -> [FastingDay] {
+        guard let settings, settings.fastingEnabled else { return [] }
+        let todayKey = todayKey
+        return (0...limitDays).compactMap { offset in
+            guard let key = DayKey.shifted(todayKey, by: offset), let day = days[key],
+                  let eveKey = DayKey.previous(key), let eve = days[eveKey],
+                  let hijri = hijriDate(for: key) else { return nil }
+            let reasons = FastingCalendar.reasons(for: day, hijri: hijri, preferences: settings.fastingPreferences)
+            guard !reasons.isEmpty else { return nil }
+            return FastingDay(dayKey: key, hijri: hijri, reasons: reasons, fajr: day.fajr, eve: eve)
+        }
+    }
 
     /// The next actual prayer after `now`. Sunrise is skipped — it is a boundary, not a prayer.
     var nextEvent: PrayerEvent? {
@@ -533,7 +574,8 @@ final class PrayerTimesStore {
             placeName: placeName,
             method: method,
             school: school,
-            hijri: settings?.hijriPreferences
+            hijri: settings?.hijriPreferences,
+            fasting: settings?.fastingPreferences
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

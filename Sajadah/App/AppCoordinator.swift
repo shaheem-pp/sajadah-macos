@@ -63,8 +63,11 @@ final class AppCoordinator {
         settings.onIqamahSourceChanged = { [iqamah] in
             iqamah.refresh()
         }
-        settings.onHijriCalendarChanged = { [store] in
+        settings.onCalendarChanged = { [weak self] in
+            guard let self else { return }
             store.syncPreferencesToCache()
+            // Fasting reminders hang off the adjusted date, so they may have moved a day.
+            rescheduleNotifications()
             WidgetCenter.shared.reloadAllTimelines()
         }
         iqamah.onTimesChanged = { [weak self] in
@@ -201,6 +204,7 @@ final class AppCoordinator {
         await scheduler.reschedule(
             prayers: prayers,
             checkIns: checkIns,
+            fastingDays: store.upcomingFastingDays(limitDays: Self.scheduleHorizonDays),
             answered: answered,
             settings: settings,
             placeName: store.placeName,
