@@ -252,22 +252,22 @@ extension NextPrayerHero {
             self.progress = nil
             self.isUrgent = false
 
-        case .awaitingIqamah(let prayer, let adhan, let iqamah):
+        case .awaitingIqamah(let prayer, _, let iqamah):
             self.prayer = prayer
             self.kicker = "AT THE MASJID"
             self.title = "\(prayer.displayName) jamaah"
             self.countdown = "in \(left(until: iqamah))"
             self.clock = at(iqamah)
-            self.progress = Self.fraction(from: adhan, to: iqamah, at: now)
+            self.progress = phase.progress(at: now)
             self.isUrgent = iqamah.timeIntervalSince(now) <= Self.urgentLead
 
-        case .inWindow(let prayer, let adhan, let closesAt):
+        case .inWindow(let prayer, _, let closesAt):
             self.prayer = prayer
             self.kicker = "IN THE WINDOW"
             self.title = prayer.displayName
             self.countdown = "\(left(until: closesAt)) left"
             self.clock = "until \(at(closesAt))"
-            self.progress = Self.fraction(from: adhan, to: closesAt, at: now)
+            self.progress = phase.progress(at: now)
             self.isUrgent = false
 
         case .dayComplete(let next):
@@ -295,13 +295,5 @@ extension NextPrayerHero {
         self.fasting = fasting
         self.isStale = isStale
         self.compact = compact
-    }
-
-    /// How far `now` has run between two instants, clamped. Nil for a span with no width,
-    /// which at extreme latitudes is a real possibility rather than a defensive guard.
-    private static func fraction(from start: Date, to end: Date, at now: Date) -> Double? {
-        let span = end.timeIntervalSince(start)
-        guard span > 0 else { return nil }
-        return min(max(now.timeIntervalSince(start) / span, 0), 1)
     }
 }

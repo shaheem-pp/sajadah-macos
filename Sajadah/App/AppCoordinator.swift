@@ -60,7 +60,13 @@ final class AppCoordinator {
             if settings.iqamahSourceMode == .offset { iqamah.refresh() }
         }
         settings.onNotificationPreferencesChanged = { [weak self] in
-            self?.rescheduleNotifications()
+            guard let self else { return }
+            rescheduleNotifications()
+            // The Isha cutoff is among these, and it decides when a widget stops saying "in
+            // the window". The cache is the only route to the widget, so rewrite it — cheap,
+            // and the other preferences in this group change rarely enough not to matter.
+            store.syncPreferencesToCache()
+            WidgetCenter.shared.reloadAllTimelines()
         }
         store.onEventsChanged = { [weak self] in
             self?.rescheduleNotifications()
