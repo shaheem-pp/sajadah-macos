@@ -222,6 +222,40 @@ replacing. **Launch at Login** may fail on a downloaded build for a related reas
 silently lying about its state; it works when you build from source with your own Apple ID.
 
 
+## Widgets
+
+Each widget answers one question, and each size is designed rather than stretched: small is
+the answer, medium the answer with its context, large the whole day. The two backgrounds are
+the app's own: the hour's sky, with the mihrab niche rising off the bottom edge, for anything
+about *now*; the quiet lattice for reference material. Text on the sky is white at graded
+opacities and text on the lattice is the system's own hierarchy, so both follow light and dark
+mode without a second palette.
+
+The Next Prayer widget is worded by the same `DayPhase` the hero and the menubar use, through
+`DayPhase.resolve` in [`Shared/Models/DayPhase.swift`](../Shared/Models/DayPhase.swift), so
+the desktop can't describe a moment differently from the popover. The one setting that rule
+needs which wasn't already in the cache — the Isha cutoff — is now written into it alongside
+the Hijri and fasting preferences. Countdowns are `Text(timerInterval:)`, which ticks on its
+own; the timeline only carries an entry at each instant the *wording* changes — every Adhan,
+every Iqamah and the quarter-hour before it, each Isha cutoff, and midnight — a few dozen
+entries a day rather than one a minute.
+
+The Prayer Log widget's buttons are `AppIntent`s, and the extension can't write the log
+itself (see below), so a tap becomes one small JSON file in
+[`Shared/Storage/WidgetLogInbox.swift`](../Shared/Storage/WidgetLogInbox.swift)'s directory —
+the extension's own container, which the app already reaches to mirror the cache. The widget
+lays pending taps over the log it reads, so a button shows as pressed immediately; the app
+folds the files into the real log at launch, on activation, and the moment one appears, via a
+kernel event on the directory. One file per tap means two processes never edit the same file.
+
+Times in every widget are shown in the timezone the timings were calculated for, not the
+Mac's — the same rule the app applies — so the two can't disagree on a trip.
+
+The views take the widget family as a plain parameter rather than reading the environment, so
+they can be rendered outside WidgetKit. The redesign was checked that way, with a small
+`ImageRenderer` harness drawing every widget at every size in both appearances across a day's
+phases; there is no other way to see a macOS widget short of adding it to the desktop.
+
 ## Widgets on unsigned builds
 
 Widgets read the same on-disk cache the app writes, so they keep working offline and cost no
