@@ -358,7 +358,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sajadah.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 202609141641;
+				CURRENT_PROJECT_VERSION = 202609141719;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 853K3F2A4U;
 				ENABLE_APP_SANDBOX = YES;
@@ -383,7 +383,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.0;
+				MARKETING_VERSION = 1.6.1;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.shaheem.Sajadah;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -404,7 +404,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sajadah.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 202609141641;
+				CURRENT_PROJECT_VERSION = 202609141719;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 853K3F2A4U;
 				ENABLE_APP_SANDBOX = YES;
@@ -429,7 +429,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.0;
+				MARKETING_VERSION = 1.6.1;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.shaheem.Sajadah;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -447,7 +447,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SajadahWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 202609141641;
+				CURRENT_PROJECT_VERSION = 202609141719;
 				DEVELOPMENT_TEAM = 853K3F2A4U;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -462,7 +462,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.0;
+				MARKETING_VERSION = 1.6.1;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.shaheem.Sajadah.SajadahWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -479,7 +479,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SajadahWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 202609141641;
+				CURRENT_PROJECT_VERSION = 202609141719;
 				DEVELOPMENT_TEAM = 853K3F2A4U;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -494,7 +494,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.0;
+				MARKETING_VERSION = 1.6.1;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.shaheem.Sajadah.SajadahWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
