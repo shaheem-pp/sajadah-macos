@@ -235,10 +235,12 @@ The Next Prayer widget is worded by the same `DayPhase` the hero and the menubar
 `DayPhase.resolve` in [`Shared/Models/DayPhase.swift`](../Shared/Models/DayPhase.swift), so
 the desktop can't describe a moment differently from the popover. The one setting that rule
 needs which wasn't already in the cache — the Isha cutoff — is now written into it alongside
-the Hijri and fasting preferences. Countdowns are `Text(timerInterval:)`, which ticks on its
-own; the timeline only carries an entry at each instant the *wording* changes — every Adhan,
-every Iqamah and the quarter-hour before it, each Isha cutoff, and midnight — a few dozen
-entries a day rather than one a minute.
+the Hijri and fasting preferences. The rule also reads the log: a prayer already logged has
+no jamaah left to catch and no window left to watch, so all three move on to the next Adhan
+the moment it is ticked, rather than counting down to a jamaah for something already prayed.
+Countdowns are `Text(timerInterval:)`, which ticks on its own; the timeline only carries an
+entry at each instant the *wording* changes — every Adhan, every Iqamah and the quarter-hour
+before it, each Isha cutoff, and midnight — a few dozen entries a day rather than one a minute.
 
 The Prayer Log widget's buttons are `AppIntent`s, and the extension can't write the log
 itself (see below), so a tap becomes one small JSON file in

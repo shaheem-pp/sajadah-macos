@@ -87,9 +87,11 @@ final class PrayerTimesStore {
     @ObservationIgnored private var sortedEvents: [PrayerEvent] = []
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var lastSeenDayKey: String?
-    /// The most recent Iqamah data `tick(_:iqamah:)` was handed, reused by `rebuildEvents()` so
-    /// a data refresh doesn't momentarily forget it until the next tick corrects it.
+    /// The most recent Iqamah data and log `tick(_:iqamah:log:)` was handed, reused by
+    /// `rebuildEvents()` so a data refresh doesn't momentarily forget them until the next tick
+    /// corrects it.
     @ObservationIgnored private var lastIqamah: IqamahTimes?
+    @ObservationIgnored private var lastLog: [String: DayLog] = [:]
     @ObservationIgnored private var settings: AppSettings?
     @ObservationIgnored private let api = AladhanAPI.shared
 
@@ -277,19 +279,23 @@ final class PrayerTimesStore {
 
     /// Where the clock sits in the day right now — see `DayPhase`.
     ///
-    /// `iqamah` and `dayIsComplete` are handed in rather than read: this store owns neither the
-    /// masjid scrape nor the user's log. Taking them as arguments keeps those dependencies
-    /// visible to a reader, and to SwiftUI's observation at the call site.
-    func phase(iqamah: IqamahTimes?, dayIsComplete: Bool) -> DayPhase {
+    /// `iqamah` and `log` are handed in rather than read: this store owns neither the masjid
+    /// scrape nor the user's log. Taking them as arguments keeps those dependencies visible
+    /// to a reader, and to SwiftUI's observation at the call site.
+    func phase(iqamah: IqamahTimes?, log: [String: DayLog]) -> DayPhase {
+        phase(at: now, iqamah: iqamah, log: log)
+    }
+
+    private func phase(at date: Date, iqamah: IqamahTimes?, log: [String: DayLog]) -> DayPhase {
         // The rule itself lives with `DayPhase`, where the widget snapshot reaches it too.
         DayPhase.resolve(
-            at: now,
+            at: date,
             events: sortedEvents,
             days: days,
             timeZone: displayTimeZone,
             iqamah: iqamah,
             ishaCutoffMinutes: settings?.ishaCutoffMinutes ?? AppSettings.defaultIshaCutoffMinutes,
-            dayIsComplete: dayIsComplete
+            log: log
         )
     }
 
@@ -319,13 +325,15 @@ final class PrayerTimesStore {
 
     // MARK: Ticking
 
-    /// `iqamah` is whatever `IqamahStore.times` currently holds — `PrayerTimesStore` doesn't
-    /// own or fetch it, just uses it to decide what the menubar should anchor on right now.
-    func tick(_ date: Date, iqamah: IqamahTimes?) {
+    /// `iqamah` is whatever `IqamahStore.times` currently holds and `log` whatever
+    /// `PrayerLogStore.days` does — `PrayerTimesStore` owns neither, just uses them to decide
+    /// what the menubar should anchor on right now.
+    func tick(_ date: Date, iqamah: IqamahTimes?, log: [String: DayLog]) {
         now = date
         lastIqamah = iqamah
+        lastLog = log
 
-        let content = makeMenuBarContent(at: date, iqamah: iqamah)
+        let content = makeMenuBarContent(at: date, iqamah: iqamah, log: log)
         if content != menuBar { menuBar = content }
 
         let dayKey = DayKey.make(for: date, in: displayTimeZone)
@@ -344,19 +352,23 @@ final class PrayerTimesStore {
     /// its Iqamah (per the masjid's posted time) hasn't, the display retargets to that Iqamah
     /// instead — one clock at a time, never both, since only one is actually the thing to wait
     /// for at any given moment.
-    private func makeMenuBarContent(at date: Date, iqamah: IqamahTimes?) -> MenuBarContent {
-        if let waiting = waitingForIqamah(at: date, iqamah: iqamah) {
-            menuBarTarget = waiting.iqamahDate
+    ///
+    /// Which of those it is comes from `DayPhase`, the same rule the hero and the widget read,
+    /// so the menubar can't keep counting to a jamaah the other two have moved on from — as it
+    /// would once the prayer is logged, when there is no jamaah left to catch.
+    private func makeMenuBarContent(at date: Date, iqamah: IqamahTimes?, log: [String: DayLog]) -> MenuBarContent {
+        if case .awaitingIqamah(let prayer, _, let iqamahDate) = phase(at: date, iqamah: iqamah, log: log) {
+            menuBarTarget = iqamahDate
             return MenuBarContent(
-                icon: waiting.event.prayer.systemImage,
-                prayer: waiting.event.prayer.displayName,
-                countdown: MenuBarContent.countdownText(from: date, until: waiting.iqamahDate),
+                icon: prayer.systemImage,
+                prayer: prayer.displayName,
+                countdown: MenuBarContent.countdownText(from: date, until: iqamahDate),
                 clockTime: TimeFormatting.clock(
-                    waiting.iqamahDate,
+                    iqamahDate,
                     use24Hour: settings?.use24HourClock ?? false,
                     timeZone: displayTimeZone
                 ),
-                prayerCase: waiting.event.prayer,
+                prayerCase: prayer,
                 moment: .iqamah
             )
         }
@@ -367,14 +379,6 @@ final class PrayerTimesStore {
             TimeFormatting.clock($0.date, use24Hour: settings?.use24HourClock ?? false, timeZone: displayTimeZone)
         } ?? ""
         return MenuBarContent(next: next, at: date, clockTime: clockTime)
-    }
-
-    private func waitingForIqamah(at date: Date, iqamah: IqamahTimes?) -> (event: PrayerEvent, iqamahDate: Date)? {
-        guard let current = currentEvent, current.prayer.isPrayer,
-              let iqamahDate = iqamah?.date(for: current.prayer, onSameDayAs: current.date, timeZone: displayTimeZone),
-              date < iqamahDate
-        else { return nil }
-        return (current, iqamahDate)
     }
 
     // MARK: Location
@@ -494,7 +498,7 @@ final class PrayerTimesStore {
     private func rebuildEvents() {
         days = rawDays.adjusted(by: settings?.adhanAdjustments ?? PrayerAdjustments())
         sortedEvents = days.values.flatMap(\.events).sorted { $0.date < $1.date }
-        menuBar = makeMenuBarContent(at: now, iqamah: lastIqamah)
+        menuBar = makeMenuBarContent(at: now, iqamah: lastIqamah, log: lastLog)
     }
 
     private func pruneOldDays() {
@@ -548,7 +552,7 @@ final class PrayerTimesStore {
     }
 
     private func handleWakeOrClockChange() {
-        tick(.now, iqamah: lastIqamah)
+        tick(.now, iqamah: lastIqamah, log: lastLog)
         refresh()
         onEventsChanged?()
     }

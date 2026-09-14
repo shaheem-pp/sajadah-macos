@@ -116,7 +116,7 @@ nonisolated struct SajadahSnapshot: Sendable {
             timeZone: timeZone,
             iqamah: iqamah,
             ishaCutoffMinutes: ishaCutoffMinutes,
-            dayIsComplete: log[dayKey(for: date)]?.isComplete ?? false
+            log: log
         )
     }
 

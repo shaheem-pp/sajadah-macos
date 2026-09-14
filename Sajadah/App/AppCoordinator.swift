@@ -92,7 +92,11 @@ final class AppCoordinator {
         // Logging a prayer retires its outstanding questions: the reschedule below rebuilds
         // the batch from scratch and simply omits anything already answered.
         log.onChange = { [weak self] in
-            self?.rescheduleNotifications()
+            guard let self else { return }
+            rescheduleNotifications()
+            // Logging the prayer in progress moves the menubar off its jamaah, and the ticker
+            // may be a minute from looking on its own.
+            store.tick(.now, iqamah: iqamah.times, log: log.days)
             // Widgets read the cache rather than polling, so they need telling it moved.
             WidgetCenter.shared.reloadAllTimelines()
         }
@@ -112,8 +116,8 @@ final class AppCoordinator {
             quran.invalidateTexts()
         }
 
-        ticker = Ticker(countdownTarget: { [store] in store.menuBarTarget }) { [weak self, store, quran, iqamah] date in
-            store.tick(date, iqamah: iqamah.times)
+        ticker = Ticker(countdownTarget: { [store] in store.menuBarTarget }) { [weak self, store, quran, iqamah, log] date in
+            store.tick(date, iqamah: iqamah.times, log: log.days)
             // Follows the same day boundary the prayer times use, so the verse turns over
             // with everything else rather than at the Mac's midnight.
             quran.refreshDailyAyah(dayKey: store.todayKey)

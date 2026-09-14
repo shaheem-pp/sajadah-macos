@@ -41,10 +41,7 @@ struct HomeView: View {
     var body: some View {
         // Derived once and handed down: the panel and the table have to be describing the
         // same moment, and asking twice invites them to drift a tick apart.
-        let phase = store.phase(
-            iqamah: iqamah.times,
-            dayIsComplete: log.isComplete(store.todayKey)
-        )
+        let phase = store.phase(iqamah: iqamah.times, log: log.days)
 
         return ScrollView {
             Group {

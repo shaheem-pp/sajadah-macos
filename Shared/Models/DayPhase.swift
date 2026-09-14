@@ -45,6 +45,7 @@ nonisolated extension DayPhase {
     ///   - days: the cached days, keyed by `DayKey`, for looking up window closes.
     ///   - iqamah: the masjid's posted times, if any — nil means no jamaah phase ever.
     ///   - ishaCutoffMinutes: when Isha's window closes, as minutes from midnight.
+    ///   - log: the user's answers, keyed by `DayKey`, for what has already been prayed.
     static func resolve(
         at now: Date,
         events: [PrayerEvent],
@@ -52,7 +53,7 @@ nonisolated extension DayPhase {
         timeZone: TimeZone,
         iqamah: IqamahTimes?,
         ishaCutoffMinutes: Int,
-        dayIsComplete: Bool
+        log: [String: DayLog]
     ) -> DayPhase {
         guard !events.isEmpty else { return .unavailable }
 
@@ -61,7 +62,16 @@ nonisolated extension DayPhase {
 
         // An answered day outranks everything else. It can't be reached early: a prayer is
         // only loggable once its own time has come.
-        if dayIsComplete { return .dayComplete(next: next) }
+        if log.isComplete(DayKey.make(for: now, in: timeZone)) { return .dayComplete(next: next) }
+
+        // A prayer already logged is answered too: there is no jamaah left to catch and no
+        // window left to watch, however much of either the clock still shows, so the question
+        // moves on to the next Adhan. Looked up on the event's own day — at 3am `current` is
+        // yesterday's Isha, and today's log knows nothing about it.
+        if let current,
+           log[DayKey.make(for: current.date, in: timeZone)]?.state(for: current.prayer) == .prayed {
+            return next.map { .awaitingAdhan(next: $0) } ?? .unavailable
+        }
 
         if let current,
            let iqamahDate = iqamah?.date(for: current.prayer, onSameDayAs: current.date, timeZone: timeZone),
