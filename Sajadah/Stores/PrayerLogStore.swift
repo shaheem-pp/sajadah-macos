@@ -71,6 +71,24 @@ final class PrayerLogStore {
         set(next, for: prayer, on: dayKey)
     }
 
+    // MARK: Widget taps
+
+    /// Folds in prayers logged from widget buttons — see `WidgetLogInbox`. One save and one
+    /// `onChange` for the batch, however many taps queued up while the app wasn't running.
+    func mergeWidgetInbox() {
+        let pending = WidgetLogInbox.pending()
+        guard !pending.isEmpty else { return }
+
+        let before = days
+        WidgetLogInbox.apply(pending, to: &days)
+        // Only the files read above: a tap that lands while this runs waits for the next pass.
+        WidgetLogInbox.remove(pending)
+
+        guard days != before else { return }
+        save()
+        onChange?()
+    }
+
     // MARK: Streaks
 
     func currentStreak(asOf todayKey: String) -> Int { days.currentStreak(asOf: todayKey) }

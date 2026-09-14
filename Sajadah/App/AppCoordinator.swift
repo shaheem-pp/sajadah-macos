@@ -28,6 +28,7 @@ final class AppCoordinator {
     let update = UpdateStore()
 
     @ObservationIgnored private var ticker: Ticker?
+    @ObservationIgnored private var inboxWatcher: WidgetInboxWatcher?
 
     init() {
         // Before anything reads or writes: data written by pre-widget builds lives in
@@ -98,6 +99,12 @@ final class AppCoordinator {
         scheduler.onCheckInResponse = { [log] prayer, dayKey, state in
             log.set(state, for: prayer, on: dayKey)
         }
+
+        // Prayers logged from a widget button queue up as files until the app folds them in:
+        // once now, for anything tapped while the app wasn't running, then as they arrive.
+        log.mergeWidgetInbox()
+        inboxWatcher = WidgetInboxWatcher { [log] in log.mergeWidgetInbox() }
+        inboxWatcher?.start()
         scheduler.onOpenSurah = { [navigation] surah in
             navigation.openSurah(surah)
         }
@@ -140,6 +147,9 @@ final class AppCoordinator {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                // A tap the directory watcher missed — it wasn't running yet, or the
+                // container appeared after launch — is caught here at the latest.
+                self.log.mergeWidgetInbox()
                 let before = self.scheduler.authorization
                 await self.scheduler.refreshAuthorization()
                 if self.scheduler.authorization != before { self.rescheduleNotifications() }

@@ -187,6 +187,9 @@ nonisolated struct SajadahSnapshot: Sendable {
             snapshot.ishaCutoffMinutes = cache.ishaCutoffMinutes ?? snapshot.ishaCutoffMinutes
         }
         snapshot.log = decode(CacheFileName.prayerLog) ?? [:]
+        // Taps made on a widget that the app hasn't folded in yet — so a button that was just
+        // pressed shows as pressed, whether or not the app is running.
+        WidgetLogInbox.apply(WidgetLogInbox.pending(), to: &snapshot.log)
         if let daily: DailyAyahCache = decode(CacheFileName.dailyAyah) {
             snapshot.dailyAyah = daily.ayah
         }

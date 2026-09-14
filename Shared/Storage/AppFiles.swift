@@ -137,6 +137,16 @@ nonisolated enum AppFiles {
         return roots
     }
 
+    /// Where widget taps queue for the app — see `WidgetLogInbox`. The same directory from
+    /// both sides: the extension's own Application Support, which it addresses as its home
+    /// and the app addresses through the container path it already mirrors into.
+    static var widgetInboxURL: URL? {
+        let root = isWidgetExtension ? fallbackRoot : widgetMirrorRoot
+        return root?
+            .appendingPathComponent("Sajadah", isDirectory: true)
+            .appendingPathComponent(WidgetLogInbox.directoryName, isDirectory: true)
+    }
+
     // MARK: Reading
 
     /// The first copy of `relativePath` this process can actually read.
