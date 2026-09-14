@@ -23,6 +23,9 @@ nonisolated struct PrayerCacheFile: Codable, Sendable {
     var fasting: FastingPreferences?
     /// `days` are the API's own times; these are applied on the way out, by app and widget alike.
     var adjustments: PrayerAdjustments?
+    /// When Isha's window closes, as minutes from midnight — the one setting the widget's
+    /// day-phase needs that isn't already in here. Optional for the same reason `hijri` is.
+    var ishaCutoffMinutes: Int?
 }
 
 nonisolated struct DailyAyahCache: Codable, Sendable {
@@ -59,6 +62,8 @@ nonisolated struct SajadahSnapshot: Sendable {
     var placeName: String?
     var hijri = HijriPreferences()
     var fasting = FastingPreferences()
+    /// Falls back to the app's own default when the cache predates the field.
+    var ishaCutoffMinutes = 23 * 60
     var dailyAyah: DailyAyah?
     var iqamah: IqamahTimes?
     /// The host of whatever page `iqamah` was scraped from (e.g. "mwcanada.org") — a trust
@@ -96,6 +101,66 @@ nonisolated struct SajadahSnapshot: Sendable {
         events.first { $0.date > date && $0.prayer.isPrayer }
     }
 
+    /// The most recent prayer that has already started.
+    func currentEvent(at date: Date) -> PrayerEvent? {
+        events.last { $0.date <= date && $0.prayer.isPrayer }
+    }
+
+    /// Where the clock sits in the day — the same answer the app's hero gives, from the same
+    /// rule, so a widget on the desktop and the popover never describe one moment differently.
+    func phase(at date: Date) -> DayPhase {
+        DayPhase.resolve(
+            at: date,
+            events: events,
+            days: days,
+            timeZone: timeZone,
+            iqamah: iqamah,
+            ishaCutoffMinutes: ishaCutoffMinutes,
+            dayIsComplete: log[dayKey(for: date)]?.isComplete ?? false
+        )
+    }
+
+    /// When the masjid's Iqamah for `event` falls, or nil where the posted value isn't a clock
+    /// time — Maghrib is usually "Sunset".
+    func iqamahDate(for event: PrayerEvent) -> Date? {
+        iqamah?.date(for: event.prayer, onSameDayAs: event.date, timeZone: timeZone)
+    }
+
+    /// The next jamaah still ahead. Checked from the prayer in progress first — its Iqamah may
+    /// not have happened yet even though its Adhan has — then forward through the timings.
+    func nextJamaah(after date: Date) -> (event: PrayerEvent, iqamah: Date)? {
+        if let current = currentEvent(at: date), let iqamah = iqamahDate(for: current), iqamah > date {
+            return (current, iqamah)
+        }
+        for event in events where event.prayer.isPrayer && event.date > date {
+            if let iqamah = iqamahDate(for: event) { return (event, iqamah) }
+        }
+        return nil
+    }
+
+    /// Whether `prayer`'s time has come today — the app's rule for when a prayer can be logged.
+    func isLoggable(_ prayer: Prayer, at date: Date) -> Bool {
+        guard let today = today(at: date) else { return false }
+        return today.time(for: prayer) <= date
+    }
+
+    /// The next fasting day after today, within `limit` days, with the reasons for it. Nil when
+    /// fasting reminders are off or nothing falls inside the horizon.
+    func nextFastingDay(after date: Date, limit: Int = 45) -> FastingDayStatus? {
+        guard fasting.enabled else { return nil }
+        var key = dayKey(for: date)
+        for _ in 0..<limit {
+            guard let next = DayKey.next(key) else { return nil }
+            key = next
+            guard let hijri = days.hijriDate(for: key, adjustedBy: self.hijri.adjustmentDays, timeZone: timeZone) else { continue }
+            let reasons = FastingCalendar.reasons(forDayKey: key, timeZone: timeZone, hijri: hijri, preferences: fasting)
+            if !reasons.isEmpty {
+                return FastingDayStatus(dayKey: key, hijri: hijri, reasons: reasons)
+            }
+        }
+        return nil
+    }
+
     func currentStreak(at date: Date) -> Int {
         log.currentStreak(asOf: dayKey(for: date))
     }
@@ -119,8 +184,12 @@ nonisolated struct SajadahSnapshot: Sendable {
             snapshot.placeName = cache.placeName
             snapshot.hijri = cache.hijri ?? HijriPreferences()
             snapshot.fasting = cache.fasting ?? FastingPreferences()
+            snapshot.ishaCutoffMinutes = cache.ishaCutoffMinutes ?? snapshot.ishaCutoffMinutes
         }
         snapshot.log = decode(CacheFileName.prayerLog) ?? [:]
+        // Taps made on a widget that the app hasn't folded in yet — so a button that was just
+        // pressed shows as pressed, whether or not the app is running.
+        WidgetLogInbox.apply(WidgetLogInbox.pending(), to: &snapshot.log)
         if let daily: DailyAyahCache = decode(CacheFileName.dailyAyah) {
             snapshot.dailyAyah = daily.ayah
         }

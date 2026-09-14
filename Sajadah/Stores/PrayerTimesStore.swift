@@ -281,33 +281,16 @@ final class PrayerTimesStore {
     /// masjid scrape nor the user's log. Taking them as arguments keeps those dependencies
     /// visible to a reader, and to SwiftUI's observation at the call site.
     func phase(iqamah: IqamahTimes?, dayIsComplete: Bool) -> DayPhase {
-        guard !sortedEvents.isEmpty else { return .unavailable }
-
-        // An answered day outranks everything else. It can't be reached early: a prayer is
-        // only loggable once its own time has come.
-        if dayIsComplete { return .dayComplete(next: nextEvent) }
-
-        // The same test the menubar retargets on, so the two can't disagree about whether a
-        // jamaah is still ahead.
-        if let waiting = waitingForIqamah(at: now, iqamah: iqamah) {
-            return .awaitingIqamah(
-                prayer: waiting.event.prayer,
-                adhan: waiting.event.date,
-                iqamah: waiting.iqamahDate
-            )
-        }
-
-        // `currentEvent` can belong to yesterday — at 3am it's yesterday's Isha — which is
-        // exactly why the window close is looked up on that event's own day rather than today's.
-        let cutoff = settings?.ishaCutoffMinutes ?? AppSettings.defaultIshaCutoffMinutes
-        if let current = currentEvent,
-           let day = day(containing: current.date),
-           let close = day.windowClose(for: current.prayer, ishaCutoffMinutes: cutoff),
-           now < close {
-            return .inWindow(prayer: current.prayer, adhan: current.date, closesAt: close)
-        }
-
-        return nextEvent.map { .awaitingAdhan(next: $0) } ?? .unavailable
+        // The rule itself lives with `DayPhase`, where the widget snapshot reaches it too.
+        DayPhase.resolve(
+            at: now,
+            events: sortedEvents,
+            days: days,
+            timeZone: displayTimeZone,
+            iqamah: iqamah,
+            ishaCutoffMinutes: settings?.ishaCutoffMinutes ?? AppSettings.defaultIshaCutoffMinutes,
+            dayIsComplete: dayIsComplete
+        )
     }
 
     /// Upcoming window closes, which is where check-in questions hang off.
@@ -625,7 +608,8 @@ final class PrayerTimesStore {
             school: school,
             hijri: settings?.hijriPreferences,
             fasting: settings?.fastingPreferences,
-            adjustments: settings?.adhanAdjustments
+            adjustments: settings?.adhanAdjustments,
+            ishaCutoffMinutes: settings?.ishaCutoffMinutes
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

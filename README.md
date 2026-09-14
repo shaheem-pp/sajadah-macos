@@ -132,11 +132,12 @@ Add them from Notification Centre → Edit Widgets. They work offline, from the 
 
 | Widget | Sizes | Shows |
 |---|---|---|
-| Next prayer | Small | The next prayer and a countdown |
-| Today's prayers | Medium | All five prayers with the next one marked, and the fasting label |
-| Masjid iqamah | Medium, Large | Adhan and jamaah for each prayer, plus Jummah |
-| Prayer streak | Small | Your streak and today's progress |
-| Ayah of the day | Medium, Large | The day's verse with its translation |
+| Next Prayer | Small, Medium | A live countdown to the next prayer, the jamaah, or the end of the window — the same as the menubar. Medium adds the day's five prayers on a timeline |
+| Today | Medium, Large | Every prayer with its Adhan and Iqamah, the next one marked, and the Hijri date. Large adds sunrise, Jummah and the fasting line |
+| Prayer Log | Small, Medium | Today's prayers as a ring, and your streak. Medium has a button for each prayer — click to log it without opening the app |
+| Masjid | Small, Medium | The next jamaah, or the full posted table with Jummah |
+| Hijri Date | Small | Today's Islamic date, fasting days, and in Ramadan a countdown to iftar |
+| Ayah of the Day | Medium, Large | The day's verse with its translation; click to open the surah |
 
 ## Settings
 
