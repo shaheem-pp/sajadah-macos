@@ -30,22 +30,45 @@ struct SajadahProvider: TimelineProvider {
         let now = Date.now
         let snapshot = SajadahSnapshot.load()
 
-        // One entry now, then one at each upcoming prayer so "next prayer" flips exactly on
-        // the boundary. The countdown itself needs no entries — `Text(_:style:)` ticks on its
-        // own — so this stays to a handful rather than one a minute.
-        var dates: [Date] = [now]
-        dates += snapshot.events
-            .filter { $0.date > now && $0.prayer.isPrayer }
-            .prefix(8)
-            .map(\.date)
+        // One entry now, then one at every instant the widgets' wording changes, so each
+        // flips exactly on its boundary. The countdown itself needs no entries —
+        // `Text(timerInterval:)` ticks on its own — so this stays to a few dozen at most
+        // rather than one a minute.
+        let horizon = now.addingTimeInterval(36 * 3600)
+        let dates = Self.boundaries(in: snapshot, after: now, until: horizon)
+        let entries = ([now] + dates).map { SajadahEntry(date: $0, snapshot: snapshot) }
 
-        let entries = dates.map { SajadahEntry(date: $0, snapshot: snapshot) }
-
-        // Re-read the cache after the last known prayer, or in an hour if there's no data yet
+        // Re-read the cache after the last boundary, or in an hour if there's no data yet
         // (the app may not have fetched anything the first time a widget is placed).
-        let refresh = dates.last.map { $0.addingTimeInterval(60) }
-            ?? now.addingTimeInterval(3600)
-
+        let refresh = dates.last.map { $0.addingTimeInterval(60) } ?? now.addingTimeInterval(3600)
         completion(Timeline(entries: entries, policy: .after(refresh)))
+    }
+
+    /// Every instant between `start` and `end` at which some widget says something different:
+    /// each Adhan, each Iqamah and the quarter-hour before it, each Isha cutoff, and each
+    /// midnight — when the log the ring is drawn from becomes a new day's.
+    static func boundaries(in snapshot: SajadahSnapshot, after start: Date, until end: Date) -> [Date] {
+        var dates: Set<Date> = []
+
+        for event in snapshot.events where event.prayer.isPrayer {
+            dates.insert(event.date)
+            if let iqamah = snapshot.iqamahDate(for: event) {
+                dates.insert(iqamah)
+                dates.insert(iqamah.addingTimeInterval(-15 * 60))
+            }
+        }
+
+        for day in snapshot.days.values {
+            if let cutoff = day.windowClose(for: .isha, ishaCutoffMinutes: snapshot.ishaCutoffMinutes) {
+                dates.insert(cutoff)
+            }
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = day.timeZone
+            if let midnight = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: day.dhuhr)) {
+                dates.insert(midnight)
+            }
+        }
+
+        return dates.filter { $0 > start && $0 <= end }.sorted()
     }
 }
