@@ -100,7 +100,7 @@ Your prayer log, streak, bookmarks and settings are kept.
 - Menubar countdown to the next prayer, or to your masjid's jamaah once the adhan has passed
 - Today's six times in the popover and the window, with the next one marked
 - The next 7 days, and the Hijri date — which turns over at Maghrib, or at midnight if you prefer
-- 17 calculation methods, both Asr conventions, and per-prayer minute adjustments for when your local calendar runs a few minutes off
+- The calculation method picked for your location, or any of 17 to choose yourself; both Asr conventions; and per-prayer minute adjustments for when your local calendar runs a few minutes off
 - Notifications at each prayer, optionally some minutes before, and a reminder before jamaah
 
 **Your masjid**

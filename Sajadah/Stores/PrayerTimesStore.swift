@@ -55,6 +55,9 @@ final class PrayerTimesStore {
     private(set) var isStale = false
     private(set) var coordinate: CLLocationCoordinate2D?
     private(set) var placeName: String?
+    /// The method the cached timings were computed with, as the API reported it. What
+    /// "Automatic" turned out to mean here; nil until a fetch has answered.
+    private(set) var resolvedMethod: ResolvedMethod?
 
     /// Advanced once a second by `Ticker`. Views that want a live countdown read this.
     private(set) var now: Date = .now
@@ -120,6 +123,7 @@ final class PrayerTimesStore {
         if cachedMethod != settings.calculationMethod || cachedSchool != settings.asrSchool.rawValue {
             rawDays = [:]
             fetchedMonths = []
+            resolvedMethod = nil
         }
         // Unconditionally: `init` derived `days` before there were settings to adjust by.
         rebuildEvents()
@@ -396,6 +400,8 @@ final class PrayerTimesStore {
             rawDays = [:]
             fetchedMonths = []
             placeName = nil
+            // Automatic may resolve differently from here.
+            resolvedMethod = nil
             rebuildEvents()
             resolvePlaceName(for: new)
         }
@@ -417,6 +423,7 @@ final class PrayerTimesStore {
             if force {
                 rawDays = [:]
                 fetchedMonths = []
+                resolvedMethod = nil
                 rebuildEvents()
             }
 
@@ -449,7 +456,8 @@ final class PrayerTimesStore {
                         school: school
                     )
                     guard !Task.isCancelled else { return }
-                    for day in result { rawDays[day.dayKey] = day }
+                    for day in result.days { rawDays[day.dayKey] = day }
+                    if let resolved = result.resolvedMethod { resolvedMethod = resolved }
                     fetchedMonths.insert(key)
                     fetchedAny = true
                 } catch {
@@ -573,6 +581,7 @@ final class PrayerTimesStore {
         rawDays = cache.days
         fetchedMonths = Set(cache.fetchedMonths)
         placeName = cache.placeName
+        resolvedMethod = cache.resolvedMethod
         // A cache from before the structured Hijri date existed has the string and nothing
         // else. Forgetting the months were fetched makes the next refresh fetch them again —
         // once — and overwrite each day in place. Only days from today on count: a refresh
@@ -613,7 +622,8 @@ final class PrayerTimesStore {
             hijri: settings?.hijriPreferences,
             fasting: settings?.fastingPreferences,
             adjustments: settings?.adhanAdjustments,
-            ishaCutoffMinutes: settings?.ishaCutoffMinutes
+            ishaCutoffMinutes: settings?.ishaCutoffMinutes,
+            resolvedMethod: resolvedMethod
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

@@ -33,12 +33,18 @@ nonisolated enum AladhanError: LocalizedError, Equatable {
 
 // MARK: - Calculation Methods
 
-/// The subset of Aladhan's `/v1/methods` worth putting in a picker. IDs are the API's.
+/// The subset of Aladhan's `/v1/methods` worth putting in a picker. IDs are the API's, except
+/// `automaticID`, which is ours: it stands for leaving `method` off the request altogether, so
+/// the API picks the authority nearest the coordinates and says which in `meta.method`.
 nonisolated struct CalculationMethod: Identifiable, Hashable, Sendable {
     let id: Int
     let name: String
 
+    /// Not an Aladhan ID — the API's start at 1.
+    static let automaticID = 0
+
     static let all: [CalculationMethod] = [
+        CalculationMethod(id: automaticID, name: "Automatic (by location)"),
         CalculationMethod(id: 3, name: "Muslim World League"),
         CalculationMethod(id: 2, name: "Islamic Society of North America (ISNA)"),
         CalculationMethod(id: 4, name: "Umm al-Qura University, Makkah"),
@@ -58,11 +64,19 @@ nonisolated struct CalculationMethod: Identifiable, Hashable, Sendable {
         CalculationMethod(id: 23, name: "Jordan"),
     ]
 
-    static let defaultID = 3
+    /// Automatic rather than any one authority: a fixed default is right for one region and
+    /// quietly 15–20 minutes off at Fajr for the rest.
+    static let defaultID = automaticID
 
     static func name(for id: Int) -> String {
         all.first { $0.id == id }?.name ?? "Method \(id)"
     }
+}
+
+/// One month of timings plus the method they were computed with.
+nonisolated struct MonthlyCalendar: Sendable {
+    let days: [DayTimings]
+    let resolvedMethod: ResolvedMethod?
 }
 
 /// Asr shadow-length convention. The API calls this `school`.
@@ -104,14 +118,13 @@ nonisolated struct AladhanAPI: Sendable {
         coordinate: CLLocationCoordinate2D,
         method: Int,
         school: Int
-    ) async throws -> [DayTimings] {
+    ) async throws -> MonthlyCalendar {
         guard var components = URLComponents(string: "https://api.aladhan.com/v1/calendar/\(year)/\(month)") else {
             throw AladhanError.badURL
         }
         components.queryItems = [
             URLQueryItem(name: "latitude", value: String(coordinate.latitude)),
             URLQueryItem(name: "longitude", value: String(coordinate.longitude)),
-            URLQueryItem(name: "method", value: String(method)),
             URLQueryItem(name: "school", value: String(school)),
             // Without this the API returns "04:31 (EDT)", which would need hand-rolled
             // timezone maths. With it, every timing is a fully-offset ISO 8601 instant.
@@ -121,6 +134,10 @@ nonisolated struct AladhanAPI: Sendable {
             // chosen to agree with this one, and a silent change of default would break that.
             URLQueryItem(name: "calendarMethod", value: "HJCoSA"),
         ]
+        // Left off for Automatic: with no `method` the API chooses by the coordinates.
+        if method != CalculationMethod.automaticID {
+            components.queryItems?.append(URLQueryItem(name: "method", value: String(method)))
+        }
         guard let url = components.url else { throw AladhanError.badURL }
 
         let data: Data
@@ -143,7 +160,14 @@ nonisolated struct AladhanAPI: Sendable {
         decoder.dateDecodingStrategy = .iso8601
         do {
             let payload = try decoder.decode(CalendarResponse.self, from: data)
-            return payload.data.compactMap(DayTimings.init(day:))
+            // The same for every day of the month; the first will do.
+            let resolved = payload.data.first.map {
+                ResolvedMethod(id: $0.meta.method.id, name: $0.meta.method.name)
+            }
+            return MonthlyCalendar(
+                days: payload.data.compactMap(DayTimings.init(day:)),
+                resolvedMethod: resolved
+            )
         } catch {
             throw AladhanError.decoding(error.localizedDescription)
         }
@@ -208,6 +232,13 @@ private nonisolated struct CalendarResponse: Decodable {
 
     struct Meta: Decodable {
         let timezone: String
+        let method: Method
+
+        /// Also carries `params` and `location`; neither is needed.
+        struct Method: Decodable {
+            let id: Int
+            let name: String
+        }
     }
 }
 
