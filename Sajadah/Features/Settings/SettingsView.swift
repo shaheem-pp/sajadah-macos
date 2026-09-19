@@ -86,6 +86,7 @@ extension SettingsPane {
 
 private struct GeneralSettingsView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(PrayerTimesStore.self) private var store
     @Environment(UpdateStore.self) private var update
     @State private var didCopyCommand = false
 
@@ -106,6 +107,11 @@ private struct GeneralSettingsView: View {
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
+                    // Automatic is only reassuring once it says what it picked.
+                    if settings.calculationMethod == CalculationMethod.automaticID,
+                       let resolved = store.resolvedMethod {
+                        Text("Using \(resolved.name), chosen for your location.")
+                    }
                     Text("Changing either of these refetches prayer times from the Aladhan API.")
                     // The one place a by-hand offset could be mistaken for the method being
                     // wrong, so the method's own pane says where the offset lives.

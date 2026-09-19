@@ -26,6 +26,16 @@ nonisolated struct PrayerCacheFile: Codable, Sendable {
     /// When Isha's window closes, as minutes from midnight — the one setting the widget's
     /// day-phase needs that isn't already in here. Optional for the same reason `hijri` is.
     var ishaCutoffMinutes: Int?
+    /// What the API computed `days` with — the answer to "Automatic" once it has been asked.
+    /// The widget never shows it; it is here so the app can after a relaunch, offline.
+    var resolvedMethod: ResolvedMethod?
+}
+
+/// The calculation method the API actually used. It differs from the setting only when that
+/// is Automatic, but it is what the footer should read either way.
+nonisolated struct ResolvedMethod: Codable, Sendable, Equatable {
+    let id: Int
+    let name: String
 }
 
 nonisolated struct DailyAyahCache: Codable, Sendable {

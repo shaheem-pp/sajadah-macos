@@ -195,18 +195,34 @@ struct MenuBarContentView: View {
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
 
-            Text(CalculationMethod.name(for: settings.calculationMethod))
+            Text(methodLabel)
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: 74, alignment: .trailing)
-                .help(CalculationMethod.name(for: settings.calculationMethod))
+                .help(methodHelp)
         }
         .font(.system(size: 12))
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(Theme.wellFill, in: RoundedRectangle(cornerRadius: Theme.rowRadius, style: .continuous))
+    }
+
+    /// The method the times were actually computed with. Under Automatic that is whatever the
+    /// API chose for the location, which is the useful thing to read — "Automatic" says nothing
+    /// about why Fajr is when it is.
+    private var methodLabel: String {
+        guard settings.calculationMethod == CalculationMethod.automaticID else {
+            return CalculationMethod.name(for: settings.calculationMethod)
+        }
+        return store.resolvedMethod?.name ?? "Automatic"
+    }
+
+    private var methodHelp: String {
+        guard settings.calculationMethod == CalculationMethod.automaticID else { return methodLabel }
+        guard let resolved = store.resolvedMethod else { return "Calculation method chosen by location" }
+        return "\(resolved.name) — chosen automatically for your location"
     }
 
     // MARK: Empty / error states
