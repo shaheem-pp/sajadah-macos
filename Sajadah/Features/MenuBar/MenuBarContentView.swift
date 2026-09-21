@@ -277,7 +277,7 @@ struct MenuBarContentView: View {
             .help("Open the full window")
 
             Button {
-                navigation.selection = .quranSearch
+                navigation.openQuranSearch()
                 showWindow()
             } label: {
                 Label("Quran", systemImage: "book")

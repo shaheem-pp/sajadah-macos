@@ -75,7 +75,11 @@ The main window is a `NavigationSplitView`: prayer times and the Quran share one
 location permission flow lives inside the prayer pane only, so a denied location never blocks
 reading. The Today page lays itself out by width: two columns when there is room — the panel,
 the day's rows and the week ahead on the left; the streak, the fasts ahead and the verse on
-the right — and one column, top to bottom in that order, when there isn't.
+the right — and one column, top to bottom in that order, when there isn't. The sidebar starts
+collapsed — today's times have no use for a list of surahs beside them — and opens when the
+window is steered into the Quran from anywhere: the popover, a notification, a widget, the
+verse on the Today page. The state lives on `AppNavigation` with the selection, for the same
+reason the selection does: the popover sets both before the window exists.
 
 The two columns end on the same line. The stack hands the taller column's height to the
 shorter one, and each column has one card that is allowed to take it: the week table, whose
