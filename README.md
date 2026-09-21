@@ -179,6 +179,8 @@ fixes, why widgets work on unsigned builds — is in [docs/how-it-works.md](docs
 - Adhan audio at prayer time
 - Read masjid pages that render their schedule with JavaScript
 
+Bigger questions — the App Store, push, donations — are worked through in [docs/ideas.md](docs/ideas.md).
+
 ## Contributing
 
 Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
