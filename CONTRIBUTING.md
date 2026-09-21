@@ -50,8 +50,11 @@ SajadahWidgets/    WidgetKit extension
 ```
 
 `AppCoordinator` owns every long-lived object and wires them together with callbacks, so the
-connections hold whether or not any view is on screen. If you add a store, register it there and
-add it to `sajadahEnvironment(_:)` in the same file — that one function feeds all three scenes.
+connections hold whether or not any view is on screen. The wiring is split by concern —
+`AppCoordinator+PrayerTimes`, `+Notifications`, `+Quran`, `+Widgets` — so a new hook goes in the
+file for what it feeds, not in `init`. If you add a store, declare it in `AppCoordinator.swift`,
+configure it in `init`, and add it to `sajadahEnvironment(_:)` in the same file — that one
+function feeds all three scenes.
 
 ## Brand assets
 
