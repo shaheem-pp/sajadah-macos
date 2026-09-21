@@ -124,6 +124,7 @@ Your prayer log, streak, bookmarks and settings are kept.
 **And**
 - Works offline — times are cached a month at a time, and a badge says when they're stale
 - No Dock icon unless a window is open; optional launch at login
+- ⌘Q closes the window and leaves Sajadah in the menubar; quit from the popover, or with ⌥⌘Q
 - No account, no analytics
 
 ## Widgets

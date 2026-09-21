@@ -77,6 +77,11 @@ reading. The Today page lays itself out by width: two columns when there is room
 and the day's rows on the left, the streak, the fasts ahead and the verse on the right, the
 week table under both — and one column, top to bottom in that order, when there isn't.
 
+⌘Q closes the windows rather than quitting. The window is a visitor; the menubar item is the
+app, and the stock Quit item took it down with the window. The real quit sits under ⌥⌘Q and on
+the popover's own button. The Dock's Quit, logout and shutdown never went through the menu
+item and still terminate.
+
 ## Quran
 
 **`QuranAPI`** fetches Arabic and translation in a single request per surah
