@@ -110,8 +110,8 @@ struct MenuBarContentView: View {
                     timeZone: store.displayTimeZone
                 ),
                 place: store.placeName ?? "Current location",
-                hijri: store.hijriDateText,
-                fasting: store.fastingIndicator,
+                hijri: store.hijriDayAndMonthText,
+                fasting: store.fastingBadge,
                 isStale: store.isStale,
                 progress: windowProgress,
                 compact: true
@@ -277,7 +277,7 @@ struct MenuBarContentView: View {
             .help("Open the full window")
 
             Button {
-                navigation.selection = .quranSearch
+                navigation.openQuranSearch()
                 showWindow()
             } label: {
                 Label("Quran", systemImage: "book")

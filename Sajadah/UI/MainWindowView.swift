@@ -15,7 +15,7 @@ struct MainWindowView: View {
     @State private var surahFilter = ""
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: sidebarVisibility) {
             sidebar
                 .navigationSplitViewColumnWidth(min: 232, ideal: 258)
         } detail: {
@@ -36,6 +36,17 @@ struct MainWindowView: View {
     }
 
     // MARK: Sidebar
+
+    /// The split view's visibility, kept as a `Bool` on `AppNavigation` so the popover and
+    /// notification taps can set it before this window exists. Anything but `.detailOnly`
+    /// counts as shown: the toggle writes `.all` for a two-column split view, and reading
+    /// `.doubleColumn` as hidden would make it lie.
+    private var sidebarVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding(
+            get: { navigation.sidebarShown ? .all : .detailOnly },
+            set: { navigation.sidebarShown = $0 != .detailOnly }
+        )
+    }
 
     private var sidebar: some View {
         @Bindable var navigation = navigation

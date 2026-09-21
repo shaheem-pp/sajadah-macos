@@ -73,9 +73,30 @@ its Iqamah still ahead, the display retargets to that Iqamah instead of silently
 
 The main window is a `NavigationSplitView`: prayer times and the Quran share one window. The
 location permission flow lives inside the prayer pane only, so a denied location never blocks
-reading. The Today page lays itself out by width: two columns when there is room — the panel
-and the day's rows on the left, the streak, the fasts ahead and the verse on the right, the
-week table under both — and one column, top to bottom in that order, when there isn't.
+reading. The Today page lays itself out by width: two columns when there is room — the panel,
+the day's rows and the week ahead on the left; the streak, the fasts ahead and the verse on
+the right — and one column, top to bottom in that order, when there isn't. The sidebar starts
+collapsed — today's times have no use for a list of surahs beside them — and opens when the
+window is steered into the Quran from anywhere: the popover, a notification, a widget, the
+verse on the Today page. The state lives on `AppNavigation` with the selection, for the same
+reason the selection does: the popover sets both before the window exists.
+
+The two columns end on the same line. The stack hands the taller column's height to the
+shorter one, and each column has one card that is allowed to take it: the week table, whose
+rows spread to fill, and the verse. The panel is pinned to its own words. It used to be the
+thing that stretched — its wash fills any height it is offered — and beside the right column
+that meant several hundred points of sky under four lines of text.
+
+The panel's fasting status is a chip on its top row rather than a third item on the footer
+line, because in the popover that line is 250 points wide and "Mississauga ON · 10 Rabīʿ
+al-thānī 1448 AH · Fasting day · Monday" truncated the two things the user had turned on. The
+popover's chip carries the label alone and the reason in its tooltip; the window's has room
+for both. The popover also drops the year from the date.
+
+⌘Q closes the windows rather than quitting. The window is a visitor; the menubar item is the
+app, and the stock Quit item took it down with the window. The real quit sits under ⌥⌘Q and on
+the popover's own button. The Dock's Quit, logout and shutdown never went through the menu
+item and still terminate.
 
 ## Quran
 

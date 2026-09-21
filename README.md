@@ -113,7 +113,7 @@ Your prayer log, streak, bookmarks and settings are kept.
 
 **Fasting**
 - Mondays, Thursdays, the white days, Ashura and Arafah, each its own switch, off by default
-- Marked beside the date, with a reminder the evening before so you can plan suhoor
+- Marked on the prayer panel, with a reminder the evening before so you can plan suhoor
 - In Ramadan: the day of the month with suhoor and iftar times, and iftar beside the date
 
 **Quran**
@@ -124,6 +124,8 @@ Your prayer log, streak, bookmarks and settings are kept.
 **And**
 - Works offline — times are cached a month at a time, and a badge says when they're stale
 - No Dock icon unless a window is open; optional launch at login
+- ⌘Q closes the window and leaves Sajadah in the menubar; quit from the popover, or with ⌥⌘Q
+- The surah list stays out of the way on the prayer page and appears when you open the Quran
 - No account, no analytics
 
 ## Widgets
@@ -177,6 +179,8 @@ fixes, why widgets work on unsigned builds — is in [docs/how-it-works.md](docs
 - Set a city by hand when location is unavailable
 - Adhan audio at prayer time
 - Read masjid pages that render their schedule with JavaScript
+
+Bigger questions — the App Store, push, donations — are worked through in [docs/ideas.md](docs/ideas.md).
 
 ## Contributing
 
