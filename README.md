@@ -113,7 +113,7 @@ Your prayer log, streak, bookmarks and settings are kept.
 
 **Fasting**
 - Mondays, Thursdays, the white days, Ashura and Arafah, each its own switch, off by default
-- Marked beside the date, with a reminder the evening before so you can plan suhoor
+- Marked on the prayer panel, with a reminder the evening before so you can plan suhoor
 - In Ramadan: the day of the month with suhoor and iftar times, and iftar beside the date
 
 **Quran**

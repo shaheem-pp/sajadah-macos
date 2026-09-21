@@ -169,10 +169,13 @@ final class PrayerTimesStore {
     /// existed, so the line never goes blank while the one-time refetch is in flight.
     var hijriDateText: String? { displayedHijriDate?.formatted ?? today?.hijri }
 
-    /// "Fasting day · Monday", "Iftar 7:32 PM", or nil. Lives beside the Hijri date it is
-    /// derived from, and is worded here rather than in the calendar because one case carries
-    /// a clock time, which only the app knows how the user wants written.
-    var fastingIndicator: String? {
+    /// The same line without the year, for the popover: a 300-point panel has no room for
+    /// "1448 AH" beside a place name, and nobody reading a countdown needs the year.
+    var hijriDayAndMonthText: String? { displayedHijriDate?.dayAndMonth ?? today?.hijri }
+
+    /// The day's fasting status, or nil. Worded here rather than in the calendar because one
+    /// case carries a clock time, which only the app knows how the user wants written.
+    var fastingBadge: FastingBadge? {
         guard let settings else { return nil }
         let indicator = days.fastingIndicator(
             at: now,
@@ -181,11 +184,14 @@ final class PrayerTimesStore {
             timeZone: displayTimeZone
         )
         return switch indicator {
-        case .fastingToday(let reasons): "Fasting day · \(reasons.joined)"
-        case .fastingTomorrow(let reasons): "Fasting tomorrow · \(reasons.joined)"
+        case .fastingToday(let reasons): FastingBadge(label: "Fasting day", detail: reasons.joined)
+        case .fastingTomorrow(let reasons): FastingBadge(label: "Fasting tomorrow", detail: reasons.joined)
         case .iftar(let maghrib):
-            "Iftar \(TimeFormatting.clock(maghrib, use24Hour: settings.use24HourClock, timeZone: displayTimeZone))"
-        case .ramadanTomorrow: "Ramadan tomorrow"
+            FastingBadge(
+                label: "Iftar \(TimeFormatting.clock(maghrib, use24Hour: settings.use24HourClock, timeZone: displayTimeZone))",
+                detail: nil
+            )
+        case .ramadanTomorrow: FastingBadge(label: "Ramadan tomorrow", detail: nil)
         case nil: nil
         }
     }
@@ -634,4 +640,19 @@ final class PrayerTimesStore {
     private var todayKeyInCurrentZone: String {
         DayKey.make(for: now, in: .current)
     }
+}
+
+// MARK: - Fasting badge
+
+/// The fasting status as the hero wears it: a short label, and the reason as detail. Split
+/// rather than one string because the popover has room for the label alone — "Fasting
+/// tomorrow · Thursday & white days" is a line, not a chip.
+struct FastingBadge: Equatable {
+    /// "Fasting day", "Fasting tomorrow", "Iftar 7:32 PM", "Ramadan tomorrow".
+    let label: String
+    /// "Monday & white days" — nil where the label already says all there is.
+    let detail: String?
+
+    /// "Fasting day · Monday".
+    var text: String { detail.map { "\(label) · \($0)" } ?? label }
 }

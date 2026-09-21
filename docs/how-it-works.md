@@ -77,6 +77,12 @@ reading. The Today page lays itself out by width: two columns when there is room
 and the day's rows on the left, the streak, the fasts ahead and the verse on the right, the
 week table under both — and one column, top to bottom in that order, when there isn't.
 
+The panel's fasting status is a chip on its top row rather than a third item on the footer
+line, because in the popover that line is 250 points wide and "Mississauga ON · 10 Rabīʿ
+al-thānī 1448 AH · Fasting day · Monday" truncated the two things the user had turned on. The
+popover's chip carries the label alone and the reason in its tooltip; the window's has room
+for both. The popover also drops the year from the date.
+
 ⌘Q closes the windows rather than quitting. The window is a visitor; the menubar item is the
 app, and the stock Quit item took it down with the window. The real quit sits under ⌥⌘Q and on
 the popover's own button. The Dock's Quit, logout and shutdown never went through the menu

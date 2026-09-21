@@ -111,7 +111,7 @@ struct HomeView: View {
             timeZone: store.displayTimeZone,
             place: store.placeName ?? "Current location",
             hijri: store.hijriDateText,
-            fasting: store.fastingIndicator,
+            fasting: store.fastingBadge,
             isStale: store.isStale
         ) {
             panel

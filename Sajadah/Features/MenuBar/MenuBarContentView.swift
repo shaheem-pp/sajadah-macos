@@ -110,8 +110,8 @@ struct MenuBarContentView: View {
                     timeZone: store.displayTimeZone
                 ),
                 place: store.placeName ?? "Current location",
-                hijri: store.hijriDateText,
-                fasting: store.fastingIndicator,
+                hijri: store.hijriDayAndMonthText,
+                fasting: store.fastingBadge,
                 isStale: store.isStale,
                 progress: windowProgress,
                 compact: true

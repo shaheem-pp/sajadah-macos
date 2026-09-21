@@ -13,6 +13,10 @@ import SwiftUI
 /// blue — so the answer is legible from across the room before a single word is read. The
 /// lattice and the arch behind it are held near the floor of visibility on purpose; they are
 /// there to give the surface a texture, not to be looked at.
+///
+/// It is as tall as its words and no taller. Everything behind them — the wash, the lattice —
+/// would happily fill any height offered, and beside a taller column that is exactly what it
+/// did: several hundred points of sky under four lines of text.
 struct NextPrayerHero: View {
     /// Whose hour the panel is washed in. Not always the prayer being counted down to — a
     /// finished day sits in Isha's night whatever comes next.
@@ -25,8 +29,9 @@ struct NextPrayerHero: View {
     let clock: String
     var place: String?
     var hijri: String?
-    /// "Fasting day · Monday" — sits beside the Hijri date it is derived from.
-    var fasting: String?
+    /// The day's fasting status, worn as a chip on the kicker row. The popover shows the label
+    /// alone and keeps the reason for the tooltip; the window has room for both.
+    var fasting: FastingBadge?
     var isStale: Bool = false
     /// How far the current window has run, 0...1. Nil when there is nothing to measure from.
     var progress: Double?
@@ -52,6 +57,7 @@ struct NextPrayerHero: View {
                 .strokeBorder(.white.opacity(isUrgent ? 0.55 : 0.10), lineWidth: isUrgent ? 1.6 : 1)
         }
         .animation(.snappy(duration: 0.25), value: isUrgent)
+        .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(clock.isEmpty ? "\(title), \(countdown)" : "\(title), \(countdown), \(clock)")
     }
@@ -72,10 +78,12 @@ struct NextPrayerHero: View {
     }
 
     private var ornament: some View {
-        ZStack(alignment: .trailing) {
+        ZStack(alignment: .bottomTrailing) {
             StarLattice(spacing: compact ? 38 : 52, color: Theme.ornamentOnSky, lineWidth: 0.8)
 
             // A niche rising off the bottom edge, with the hour's symbol standing in it.
+            // Anchored to that edge rather than centred, so the top-right corner stays clear
+            // for the fasting chip.
             MihrabArch()
                 .fill(.white.opacity(0.08))
                 .overlay {
@@ -95,17 +103,32 @@ struct NextPrayerHero: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: compact ? 6 : 10) {
+            // The status row: what kind of moment this is, whether the times are current, and
+            // whether today is a fast. The first two are pinned to one line — the chip is
+            // the one that gives when the popover is short of room.
             HStack(spacing: 6) {
                 Text(kicker)
                     .font(.system(size: compact ? 9.5 : 10.5, weight: .semibold))
                     .tracking(1.1)
                     .foregroundStyle(.white.opacity(0.70))
+                    .lineLimit(1)
+                    .fixedSize()
 
                 if isStale {
                     Label("Offline", systemImage: "wifi.slash")
                         .font(.system(size: compact ? 9 : 10, weight: .medium))
                         .foregroundStyle(.white.opacity(0.70))
                         .labelStyle(.titleAndIcon)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+
+                if let fasting {
+                    // A trailing frame rather than a Spacer before the chip: a Spacer is as
+                    // flexible as the chip, so a short row was split between them and the
+                    // chip truncated with room still to its left.
+                    fastingChip(fasting)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
 
@@ -140,7 +163,7 @@ struct NextPrayerHero: View {
                 windowBar(progress)
             }
 
-            if place != nil || hijri != nil || fasting != nil {
+            if place != nil || hijri != nil {
                 footer
             }
         }
@@ -165,6 +188,36 @@ struct NextPrayerHero: View {
         .accessibilityHidden(true)
     }
 
+    /// Brass on the sky, as the footer used to write it, but in the corner rather than as a
+    /// third item on the footer's one line — which, in the popover, it never fit on: the date
+    /// and the fast truncated each other. The corner is the lightest part of the wash, so the
+    /// chip carries its own scrim.
+    private func fastingChip(_ badge: FastingBadge) -> some View {
+        Button {
+            navigation.settingsPane = .fasting
+            openSettings()
+        } label: {
+            Text(compact ? badge.label : badge.text)
+                .font(.system(size: compact ? 9.5 : 10.5, weight: .semibold))
+                .foregroundStyle(Theme.brassOnSky)
+                .lineLimit(1)
+                // "Fasting tomorrow" beside "AT THE MASJID" and "Offline" is the one row the
+                // popover can't seat at full size; a fifth smaller is still legible, and
+                // beats an ellipsis.
+                .minimumScaleFactor(0.8)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(.black.opacity(0.22), in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(Theme.brassOnSky.opacity(0.35), lineWidth: 0.8)
+                }
+        }
+        .buttonStyle(.plain)
+        .pointerStyle(.link)
+        // The popover's chip drops the reason, so the tooltip is where it went.
+        .help(compact ? badge.text : "Adjust the Hijri date and fasting days")
+    }
+
     private var footer: some View {
         HStack(spacing: 5) {
             if let place {
@@ -172,32 +225,22 @@ struct NextPrayerHero: View {
                     .font(.system(size: compact ? 8 : 9))
                 Text(place)
             }
-            if place != nil && (hijri != nil || fasting != nil) {
+            if place != nil && hijri != nil {
                 separator
             }
             // The date is the thing you'd want to adjust, so it is also the way to where that
-            // happens — there is no other cue in the app that it can be.
-            Button {
-                navigation.settingsPane = .fasting
-                openSettings()
-            } label: {
-                HStack(spacing: 5) {
-                    if let hijri {
-                        Text(hijri)
-                    }
-                    if hijri != nil && fasting != nil {
-                        separator
-                    }
-                    if let fasting {
-                        Text(fasting)
-                            .fontWeight(.medium)
-                            .foregroundStyle(Theme.brassOnSky)
-                    }
+            // happens — the chip above is the only other cue in the app that it can be.
+            if let hijri {
+                Button {
+                    navigation.settingsPane = .fasting
+                    openSettings()
+                } label: {
+                    Text(hijri)
                 }
+                .buttonStyle(.plain)
+                .pointerStyle(.link)
+                .help("Adjust the Hijri date and fasting days")
             }
-            .buttonStyle(.plain)
-            .pointerStyle(.link)
-            .help("Adjust the Hijri date and fasting days")
         }
         .font(.system(size: compact ? 10.5 : 12))
         .foregroundStyle(.white.opacity(0.85))
@@ -229,7 +272,7 @@ extension NextPrayerHero {
         timeZone: TimeZone,
         place: String?,
         hijri: String?,
-        fasting: String? = nil,
+        fasting: FastingBadge? = nil,
         isStale: Bool = false,
         compact: Bool = false
     ) {
