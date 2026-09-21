@@ -11,9 +11,15 @@ import SwiftUI
 /// popover does, so the two always agree.
 ///
 /// Two columns when there is room for them, one when there isn't. The left column is *now* —
-/// the panel and the day's rows, the things you act on; the right is the *record* — the
-/// streak, the fasts ahead, the verse. The week table wants width more than height, so it
-/// runs under both. A window narrower than that reads top to bottom in the same order.
+/// the panel, the day's rows and the week ahead, the things you act on; the right is the
+/// *record* — the streak, the fasts ahead, the verse. A window narrower than that reads top
+/// to bottom in the same order.
+///
+/// The two columns end on the same line. The stack proposes the taller column's height to
+/// the shorter one, and each column has one card that is allowed to take it: the week table
+/// on the left, whose rows spread to fill, and the verse on the right. The panel used to be
+/// what stretched — several hundred points of sky doing the job of a spacer — which is why it
+/// now pins itself to its words and the week table sits under Today instead of under both.
 struct HomeView: View {
     @Environment(PrayerTimesStore.self) private var store
     @Environment(AppSettings.self) private var settings
@@ -31,9 +37,9 @@ struct HomeView: View {
     /// The record column is fixed: the streak calendar and a verse at reading size both sit
     /// comfortably in it, and a column that grew with the window would starve the rows.
     private static let sideColumnWidth: CGFloat = 340
-    /// Two columns need the side column plus a left column no narrower than the page's own
-    /// minimum was when it was a single column.
-    private static let twoColumnMinWidth: CGFloat = 840
+    /// Two columns need the side column plus a left column wide enough for the week table's
+    /// seven columns to stay readable — about 64 points each for a 12-hour time.
+    private static let twoColumnMinWidth: CGFloat = 960
     private static let maxContentWidth: CGFloat = 1080
 
     private var isWide: Bool { width - 2 * Self.inset >= Self.twoColumnMinWidth }
@@ -63,25 +69,22 @@ struct HomeView: View {
     // MARK: Layouts
 
     private func wide(_ phase: DayPhase) -> some View {
-        VStack(alignment: .leading, spacing: Self.gap) {
-            HStack(alignment: .top, spacing: Self.gap) {
-                VStack(alignment: .leading, spacing: Self.gap) {
-                    hero(phase)
-                    if let day = store.today {
-                        today(day, phase: phase)
-                    }
+        HStack(alignment: .top, spacing: Self.gap) {
+            VStack(alignment: .leading, spacing: Self.gap) {
+                hero(phase)
+                if let day = store.today {
+                    today(day, phase: phase)
                 }
-                .frame(maxWidth: .infinity)
-
-                VStack(alignment: .leading, spacing: Self.gap) {
-                    streak
-                    fasting
-                    ayahOfTheDay
-                }
-                .frame(width: Self.sideColumnWidth)
+                weekAhead
             }
+            .frame(maxWidth: .infinity)
 
-            weekAhead
+            VStack(alignment: .leading, spacing: Self.gap) {
+                streak
+                fasting
+                ayahOfTheDay
+            }
+            .frame(width: Self.sideColumnWidth)
         }
     }
 
@@ -91,9 +94,9 @@ struct HomeView: View {
             if let day = store.today {
                 today(day, phase: phase)
             }
+            weekAhead
             streak
             fasting
-            weekAhead
             ayahOfTheDay
         }
     }
@@ -302,13 +305,16 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 8) {
                 SectionHeader(title: "Next 7 days")
 
-                // Every cell is flexible, so the columns share whatever width the card has
-                // rather than the card shrinking to the columns — under two columns of
-                // content above it, a table that stopped short would look unfinished.
+                // Every time cell is flexible both ways. Across, so the columns share the
+                // card's width rather than the card shrinking to them; down, so the rows
+                // share whatever height the column has spare — this is the card that levels
+                // the left column with the right. The Day column keeps its natural width: it
+                // is the one with words in it, and "Wed 23 Sep" was the first thing to
+                // truncate when it had to split the width six ways with the times.
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 0) {
                     GridRow {
                         Text("Day")
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize()
                         ForEach(Prayer.allCases) { prayer in
                             Text(prayer.displayName)
                                 .foregroundStyle(prayer.isPrayer ? AnyShapeStyle(prayer.tint) : AnyShapeStyle(.tertiary))
@@ -330,7 +336,7 @@ struct HomeView: View {
                                 ))
                                 .monospacedDigit()
                                 .foregroundStyle(prayer.isPrayer ? .primary : .tertiary)
-                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                             }
                         }
                         .font(.system(size: 12))
@@ -370,7 +376,8 @@ struct HomeView: View {
                     .help("Fasting day · \(reasons.joined)")
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize()
+        .frame(maxHeight: .infinity, alignment: .leading)
     }
 
     // MARK: Ayah of the day
@@ -391,6 +398,9 @@ struct HomeView: View {
                     // so this lands in the reader at the ayah with no window to bring forward.
                     navigation.open(daily.ref)
                 }
+                // The right column's levelling card, as the week table is the left's. Room
+                // under a verse is the least awkward place for any to end up.
+                .frame(maxHeight: .infinity, alignment: .top)
                 .sajadahCard()
             }
         }

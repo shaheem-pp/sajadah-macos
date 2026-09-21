@@ -73,9 +73,15 @@ its Iqamah still ahead, the display retargets to that Iqamah instead of silently
 
 The main window is a `NavigationSplitView`: prayer times and the Quran share one window. The
 location permission flow lives inside the prayer pane only, so a denied location never blocks
-reading. The Today page lays itself out by width: two columns when there is room — the panel
-and the day's rows on the left, the streak, the fasts ahead and the verse on the right, the
-week table under both — and one column, top to bottom in that order, when there isn't.
+reading. The Today page lays itself out by width: two columns when there is room — the panel,
+the day's rows and the week ahead on the left; the streak, the fasts ahead and the verse on
+the right — and one column, top to bottom in that order, when there isn't.
+
+The two columns end on the same line. The stack hands the taller column's height to the
+shorter one, and each column has one card that is allowed to take it: the week table, whose
+rows spread to fill, and the verse. The panel is pinned to its own words. It used to be the
+thing that stretched — its wash fills any height it is offered — and beside the right column
+that meant several hundred points of sky under four lines of text.
 
 The panel's fasting status is a chip on its top row rather than a third item on the footer
 line, because in the popover that line is 250 points wide and "Mississauga ON · 10 Rabīʿ
